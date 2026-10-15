@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização CSS institucional
+# Estilização CSS institucional adaptativa para Tema Claro e Tema Escuro
 st.markdown("""
 <style>
     body, [class*="css"] {
@@ -28,24 +28,29 @@ st.markdown("""
     .titulo-institucional {
         font-size: 1.65rem;
         font-weight: 700;
-        color: #1e293b;
         letter-spacing: -0.02em;
         margin-bottom: 0.2rem;
+        color: var(--text-color) !important;
     }
     .subtitulo-institucional {
         font-size: 0.92rem;
-        color: #64748b;
+        color: var(--text-color) !important;
+        opacity: 0.75;
         margin-bottom: 1.2rem;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.25);
         padding-bottom: 0.6rem;
     }
+    /* Expander adaptativo para tema claro e escuro */
     div[data-testid="stExpander"] {
-        border: 1px solid #cbd5e1;
-        border-radius: 4px;
-        background-color: #fafafa;
+        border: 1px solid rgba(128, 128, 128, 0.25) !important;
+        border-radius: 6px !important;
+        background-color: transparent !important;
+    }
+    div[data-testid="stExpander"] > details {
+        background-color: transparent !important;
     }
     button[kind="primary"], button[kind="secondary"] {
-        border-radius: 3px !important;
+        border-radius: 4px !important;
         font-weight: 500 !important;
     }
 </style>
