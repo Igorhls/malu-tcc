@@ -2,72 +2,124 @@ import io
 import os
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from gerar_graficos import (
-    DADOS,
-    PONTOS,
-    COR_MANHA,
-    COR_TARDE,
-    COR_NOITE,
-    COR_TEXTO,
-    COR_GRADE,
-    COR_BORDA,
-    configurar_estilo,
-    criar_dataframe,
-    gerar_planilha_excel
-)
+import openpyxl
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.chart import LineChart, Reference
 
 # ---------------------------------------------------------------------------
-# CONFIGURAÇÃO DA PÁGINA STREAMLIT
+# CONFIGURAÇÃO GERAL E ESTILO VZN
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Monitoramento de Temperatura - BOSQUE",
-    page_icon="🌡️",
+    page_title="VZN EcoClima - Gerador de Tabelas e Gráficos",
+    page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Aplicar estilo às fontes
-configurar_estilo()
+# Paleta visual fiel ao modelo original
+COR_MANHA = '#265b79'   # Azul petróleo
+COR_TARDE = '#e27641'   # Laranja terracota
+COR_NOITE = '#236532'   # Verde escuro
+COR_TEXTO = '#595959'   # Cinza escuro para títulos e eixos
+COR_GRADE = '#e6e6e6'   # Cinza claro para linhas de grade
+COR_BORDA = '#d9d9d9'   # Cinza suave para contornos
+
+# Fontes
+plt.rcParams['font.sans-serif'] = ['Cambria', 'Times New Roman', 'DejaVu Serif', 'serif']
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['axes.edgecolor'] = COR_BORDA
+plt.rcParams['axes.linewidth'] = 0.8
+
+# Dados pré-carregados padrão (modelo de Malu)
+PRESETS = {
+    "Dia 14 de Agosto": {
+        "titulo_dia": "Dia 14 de agosto",
+        "titulo_grafico": "DIA 14 DE AGOSTO - BOSQUE",
+        "min_y": 24.0,
+        "max_y": 32.0,
+        "df": pd.DataFrame({
+            'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+            'Manha': [26.2, 26.5, 26.5, 26.9, 27.2, 27.4, 27.1, 27.2, 27.3, 27.6],
+            'Tarde': [28.5, 29.0, 29.5, 29.6, 30.4, 29.9, 30.9, 31.4, 30.3, 30.5],
+            'Noite': [25.5, 26.1, 26.2, 26.4, 26.9, 26.7, 26.8, 26.9, 27.0, 27.1]
+        })
+    },
+    "Dia 16 de Agosto": {
+        "titulo_dia": "Dia 16 de agosto",
+        "titulo_grafico": "DIA 16 DE AGOSTO - BOSQUE",
+        "min_y": 24.0,
+        "max_y": 32.0,
+        "df": pd.DataFrame({
+            'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+            'Manha': [26.0, 25.3, 25.3, 26.6, 26.2, 25.5, 25.4, 26.2, 26.0, 26.3],
+            'Tarde': [28.5, 28.6, 28.9, 31.0, 30.8, 29.5, 30.4, 30.6, 30.0, 29.9],
+            'Noite': [25.8, 26.0, 26.1, 26.7, 26.8, 27.0, 27.0, 26.9, 26.6, 27.1]
+        })
+    },
+    "Dia 19 de Agosto": {
+        "titulo_dia": "Dia 19 de agosto",
+        "titulo_grafico": "DIA 19 DE AGOSTO - BOSQUE",
+        "min_y": 22.0,
+        "max_y": 32.0,
+        "df": pd.DataFrame({
+            'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+            'Manha': [24.7, 24.0, 23.4, 23.6, 23.8, 23.6, 23.5, 23.8, 24.2, 24.4],
+            'Tarde': [28.2, 28.5, 28.9, 31.5, 31.0, 28.9, 31.0, 31.8, 30.0, 30.6],
+            'Noite': [27.1, 25.5, 25.3, 26.7, 26.2, 26.1, 25.8, 27.0, 27.1, 25.6]
+        })
+    }
+}
 
 
-def render_grafico(df, info, periodos, com_marcadores=False):
-    """Renderiza a figura do matplotlib de acordo com os filtros selecionados."""
-    fig, ax = plt.subplots(figsize=(8.0, 4.0), dpi=200)
+def gerar_figura_matplotlib(df, titulo_grafico, min_y=None, max_y=None, com_marcadores=False):
+    """Gera a figura Matplotlib com estética idêntica ao modelo original."""
+    fig, ax = plt.subplots(figsize=(6.8, 3.6), dpi=200)
     fig.patch.set_facecolor('white')
     ax.set_facecolor('white')
 
-    marcadores = {'Manha': 'o', 'Tarde': 's', 'Noite': '^'}
-    cores = {'Manha': COR_MANHA, 'Tarde': COR_TARDE, 'Noite': COR_NOITE}
+    pontos = df['Pontos'].astype(str).tolist()
+    m_marker = 'o' if com_marcadores else None
+    t_marker = 's' if com_marcadores else None
+    n_marker = '^' if com_marcadores else None
 
-    for periodo in periodos:
-        m = marcadores[periodo] if com_marcadores else None
-        ax.plot(
-            df['Pontos'], df[periodo],
-            label=periodo,
-            color=cores[periodo],
-            linewidth=2.2,
-            marker=m,
-            markersize=6
-        )
+    # Linhas dos períodos
+    if 'Manha' in df.columns:
+        ax.plot(pontos, df['Manha'], label='Manha', color=COR_MANHA, linewidth=2.0, marker=m_marker, markersize=5)
+    if 'Tarde' in df.columns:
+        ax.plot(pontos, df['Tarde'], label='Tarde', color=COR_TARDE, linewidth=2.0, marker=t_marker, markersize=5)
+    if 'Noite' in df.columns:
+        ax.plot(pontos, df['Noite'], label='Noite', color=COR_NOITE, linewidth=2.0, marker=n_marker, markersize=5)
 
-    ax.set_title(info["titulo_grafico"], fontsize=13, color=COR_TEXTO, pad=25)
+    ax.set_title(titulo_grafico, fontsize=12, color=COR_TEXTO, pad=25)
 
-    if periodos:
-        leg = ax.legend(
-            loc='upper center', bbox_to_anchor=(0.5, 1.15),
-            ncol=len(periodos), frameon=False, fontsize=10,
-            handlelength=1.5, handletextpad=0.5, columnspacing=1.6
-        )
+    leg = ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15),
+                    ncol=3, frameon=False, fontsize=9.5,
+                    handlelength=1.5, handletextpad=0.5, columnspacing=1.5)
+    if leg:
         for text in leg.get_texts():
             text.set_color(COR_TEXTO)
 
-    ax.set_ylabel("Temperatura do ar (°C)", fontsize=10, color=COR_TEXTO, labelpad=8)
-    ax.set_xlabel("Pontos", fontsize=10, color=COR_TEXTO, labelpad=8)
+    ax.set_ylabel("Temperatura do ar (°C)", fontsize=9.5, color=COR_TEXTO, labelpad=8)
+    ax.set_xlabel("Pontos", fontsize=9.5, color=COR_TEXTO, labelpad=8)
 
-    ax.set_ylim(info["ylim"])
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+    # Configuração de limites Y
+    todas_temps = []
+    for col in ['Manha', 'Tarde', 'Noite']:
+        if col in df.columns:
+            todas_temps.extend(pd.to_numeric(df[col], errors='coerce').dropna().tolist())
+
+    if todas_temps:
+        real_min = min(todas_temps)
+        real_max = max(todas_temps)
+        pad_min = (int(real_min // 2) * 2) if min_y is None else min_y
+        pad_max = (int(np.ceil(real_max / 2)) * 2) if max_y is None else max_y
+        if pad_max <= pad_min:
+            pad_max = pad_min + 2
+        ax.set_ylim(pad_min, pad_max)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
 
     ax.grid(axis='y', color=COR_GRADE, linestyle='-', linewidth=0.8)
     ax.grid(axis='x', visible=False)
@@ -78,155 +130,305 @@ def render_grafico(df, info, periodos, com_marcadores=False):
     ax.spines['bottom'].set_color(COR_BORDA)
     ax.spines['bottom'].set_linewidth(0.8)
 
-    ax.tick_params(axis='y', which='both', length=0, labelsize=10, labelcolor=COR_TEXTO)
-    ax.tick_params(axis='x', which='both', length=3, color=COR_BORDA, labelsize=10, labelcolor=COR_TEXTO)
+    ax.tick_params(axis='y', which='both', length=0, labelsize=9.5, labelcolor=COR_TEXTO)
+    ax.tick_params(axis='x', which='both', length=3, color=COR_BORDA, labelsize=9.5, labelcolor=COR_TEXTO)
 
     plt.tight_layout()
     return fig
 
 
+def gerar_excel_bytes(df, titulo_dia, titulo_grafico, min_y, max_y):
+    """Gera uma planilha Excel em memória (.xlsx) com a tabela e o gráfico nativo ao lado."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Dados e Grafico"
+
+    borda_fina = Border(
+        left=Side(style='thin', color='A6A6A6'),
+        right=Side(style='thin', color='A6A6A6'),
+        top=Side(style='thin', color='A6A6A6'),
+        bottom=Side(style='thin', color='A6A6A6')
+    )
+
+    # Cabeçalho mesclado do dia
+    ws.merge_cells("B2:E2")
+    header = ws.cell(row=2, column=2, value=titulo_dia)
+    header.font = Font(name="Cambria", size=11, bold=True)
+    header.alignment = Alignment(horizontal="center", vertical="center")
+    for c in range(2, 6):
+        ws.cell(row=2, column=c).border = borda_fina
+
+    # Nomes das colunas
+    colunas = ["Pontos", "Manha", "Tarde", "Noite"]
+    for idx, col in enumerate(colunas, start=2):
+        c = ws.cell(row=3, column=idx, value=col)
+        c.font = Font(name="Cambria", size=10, bold=True)
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = borda_fina
+
+    # Linhas de dados
+    for r_idx, row in df.iterrows():
+        r = 4 + r_idx
+        ws.cell(row=r, column=2, value=str(row['Pontos'])).alignment = Alignment(horizontal="center")
+        for col_idx, col_name in enumerate(["Manha", "Tarde", "Noite"], start=3):
+            val = row.get(col_name, np.nan)
+            cell = ws.cell(row=r, column=col_idx, value=float(val) if pd.notnull(val) else None)
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = borda_fina
+            if cell.value is not None:
+                cell.number_format = '0.0'
+        ws.cell(row=r, column=2).border = borda_fina
+
+    fim_dados = 3 + len(df)
+
+    # Adicionar Gráfico Nativo do Excel ao lado (coluna G)
+    chart = LineChart()
+    chart.title = titulo_grafico
+    chart.style = 10
+    chart.y_axis.title = "Temperatura do ar (°C)"
+    chart.x_axis.title = "Pontos"
+    if min_y is not None:
+        chart.y_axis.scaling.min = min_y
+    if max_y is not None:
+        chart.y_axis.scaling.max = max_y
+    chart.y_axis.majorUnit = 2
+    chart.width = 16
+    chart.height = 9.5
+
+    dados_ref = Reference(ws, min_col=3, min_row=3, max_col=5, max_row=fim_dados)
+    cats_ref = Reference(ws, min_col=2, min_row=4, max_row=fim_dados)
+    chart.add_data(dados_ref, titles_from_data=True)
+    chart.set_categories(cats_ref)
+    ws.add_chart(chart, "G2")
+
+    ws.column_dimensions['A'].width = 3
+    ws.column_dimensions['B'].width = 11
+    ws.column_dimensions['C'].width = 11
+    ws.column_dimensions['D'].width = 11
+    ws.column_dimensions['E'].width = 11
+    ws.column_dimensions['F'].width = 4
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------------------
-# BARRA LATERAL (SIDEBAR)
+# BARRA LATERAL (VZN BRANDING & CONFIGURAÇÕES)
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.title("🌡️ Painel de Controle")
-    st.write("**Projeto: TCC - BOSQUE**")
+    st.markdown("## 🌿 **VZN EcoClima**")
+    st.caption("Studio de Visualização Microclimática • TCC")
     st.markdown("---")
 
-    visualizacao = st.radio(
-        "Modo de visualização:",
-        ["Dia Individual", "Todos os Dias (Painel)", "Tabela Comparativa"]
+    st.subheader("⚡ Modelos Prontos")
+    preset_escolhido = st.selectbox(
+        "Carregar dados pré-definidos:",
+        ["Criar Novo / Em Branco"] + list(PRESETS.keys())
     )
 
     st.markdown("---")
-    st.subheader("Configurações do Gráfico")
-    com_marcadores = st.checkbox("Exibir marcadores nos pontos", value=False)
-    mostrar_tabela = st.checkbox("Exibir tabela de dados brutos", value=True)
-    mostrar_estatisticas = st.checkbox("Exibir métricas e estatísticas", value=True)
+    st.subheader("📁 Importar Planilha")
+    uploaded_file = st.file_uploader(
+        "Carregar arquivo (.xlsx ou .csv):",
+        type=["xlsx", "csv"],
+        help="A planilha deve conter colunas: Pontos, Manha, Tarde, Noite"
+    )
 
     st.markdown("---")
-    st.subheader("📥 Downloads")
-
-    # Gerar a planilha Excel sob demanda ou fornecer a existente
-    excel_path = "dados_e_graficos_bosque.xlsx"
-    if not os.path.exists(excel_path):
-        gerar_planilha_excel(excel_path)
-
-    with open(excel_path, "rb") as f:
-        st.download_button(
-            label="📊 Baixar Planilha Excel (.xlsx)",
-            data=f.read(),
-            file_name="dados_e_graficos_bosque.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-
+    st.subheader("🎨 Opções Visuais")
+    opt_marcadores = st.checkbox("Exibir pontos/marcadores na linha", value=False)
+    ajustar_escala = st.checkbox("Definir escala Y manualmente", value=True)
 
 # ---------------------------------------------------------------------------
-# CONTEÚDO PRINCIPAL
+# INICIALIZAÇÃO DO ESTADO DA SESSÃO (SESSION STATE)
 # ---------------------------------------------------------------------------
-st.title("🌳 Análise de Temperatura do Ar - BOSQUE")
-st.caption("Visualização e análise de dados microclimáticos coletados nos pontos P1 a P10.")
+if "ultimo_preset" not in st.session_state:
+    st.session_state.ultimo_preset = "Dia 14 de Agosto"
+    st.session_state.titulo_dia = PRESETS["Dia 14 de Agosto"]["titulo_dia"]
+    st.session_state.titulo_grafico = PRESETS["Dia 14 de Agosto"]["titulo_grafico"]
+    st.session_state.min_y = PRESETS["Dia 14 de Agosto"]["min_y"]
+    st.session_state.max_y = PRESETS["Dia 14 de Agosto"]["max_y"]
+    st.session_state.df_atual = PRESETS["Dia 14 de Agosto"]["df"].copy()
 
-if visualizacao == "Dia Individual":
-    col_sel1, col_sel2 = st.columns([1, 2])
-
-    with col_sel1:
-        dia_selecionado = st.selectbox(
-            "Selecione o Dia:",
-            options=["14", "16", "19"],
-            format_func=lambda x: DADOS[x]["dia_nome"]
-        )
-
-    with col_sel2:
-        periodos_selecionados = st.multiselect(
-            "Períodos do dia:",
-            options=["Manha", "Tarde", "Noite"],
-            default=["Manha", "Tarde", "Noite"]
-        )
-
-    if not periodos_selecionados:
-        st.warning("Selecione pelo menos um período (Manhã, Tarde ou Noite) para exibir o gráfico.")
+# Se o usuário trocou o preset no seletor
+if preset_escolhido != st.session_state.ultimo_preset:
+    st.session_state.ultimo_preset = preset_escolhido
+    if preset_escolhido in PRESETS:
+        p = PRESETS[preset_escolhido]
+        st.session_state.titulo_dia = p["titulo_dia"]
+        st.session_state.titulo_grafico = p["titulo_grafico"]
+        st.session_state.min_y = p["min_y"]
+        st.session_state.max_y = p["max_y"]
+        st.session_state.df_atual = p["df"].copy()
     else:
-        info_dia = DADOS[dia_selecionado]
-        df_dia = criar_dataframe(dia_selecionado)
+        st.session_state.titulo_dia = "Novo Dia"
+        st.session_state.titulo_grafico = "NOVO DIA - BOSQUE"
+        st.session_state.min_y = 20.0
+        st.session_state.max_y = 35.0
+        st.session_state.df_atual = pd.DataFrame({
+            'Pontos': [f"P{i}" for i in range(1, 11)],
+            'Manha': [25.0] * 10,
+            'Tarde': [30.0] * 10,
+            'Noite': [26.0] * 10
+        })
 
-        # Métricas em destaque
-        if mostrar_estatisticas:
-            temp_max = df_dia[periodos_selecionados].max().max()
-            temp_min = df_dia[periodos_selecionados].min().min()
-            temp_media = df_dia[periodos_selecionados].mean().mean()
+# Se o usuário fez upload de uma planilha
+if uploaded_file is not None:
+    try:
+        if uploaded_file.name.endswith(".csv"):
+            df_up = pd.read_csv(uploaded_file)
+        else:
+            df_up = pd.read_excel(uploaded_file)
 
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Temperatura Média", f"{temp_media:.1f} °C")
-            m2.metric("Temperatura Máxima", f"{temp_max:.1f} °C")
-            m3.metric("Temperatura Mínima", f"{temp_min:.1f} °C")
+        # Mapeamento de colunas flexível (com/sem acento)
+        col_map = {}
+        for c in df_up.columns:
+            c_clean = str(c).strip().lower()
+            if 'ponto' in c_clean:
+                col_map[c] = 'Pontos'
+            elif 'manh' in c_clean or 'manha' in c_clean:
+                col_map[c] = 'Manha'
+            elif 'tarde' in c_clean:
+                col_map[c] = 'Tarde'
+            elif 'noite' in c_clean:
+                col_map[c] = 'Noite'
 
-        # Gráfico
-        fig = render_grafico(df_dia, info_dia, periodos_selecionados, com_marcadores)
-        st.pyplot(fig)
+        df_up = df_up.rename(columns=col_map)
+        colunas_necessarias = ['Pontos', 'Manha', 'Tarde', 'Noite']
+        if all(c in df_up.columns for c in colunas_necessarias):
+            st.session_state.df_atual = df_up[colunas_necessarias].copy()
+            nome_base = os.path.splitext(uploaded_file.name)[0]
+            st.session_state.titulo_dia = nome_base
+            st.session_state.titulo_grafico = f"{nome_base.upper()} - BOSQUE"
+            st.sidebar.success(f"Planilha '{uploaded_file.name}' carregada com sucesso!")
+        else:
+            st.sidebar.error("A planilha precisa ter as colunas: Pontos, Manha, Tarde e Noite.")
+    except Exception as e:
+        st.sidebar.error(f"Erro ao ler planilha: {e}")
 
-        # Botão para baixar imagem do gráfico atual
-        buf_png = io.BytesIO()
-        fig.savefig(buf_png, format="png", dpi=300, bbox_inches="tight")
-        st.download_button(
-            label=f"📥 Baixar Gráfico ({info_dia['dia_nome']}) em Alta Resolução (PNG 300 DPI)",
-            data=buf_png.getvalue(),
-            file_name=f"grafico_dia_{dia_selecionado}.png",
-            mime="image/png"
-        )
-        plt.close(fig)
+# ---------------------------------------------------------------------------
+# CABEÇALHO PRINCIPAL
+# ---------------------------------------------------------------------------
+st.title("🌿 VZN EcoClima — Painel Interativo de Malu")
+st.markdown(
+    "Edite os valores na **tabela à esquerda** (ou importe sua planilha) e veja o **gráfico ao lado atualizando instantaneamente em tempo real**."
+)
+st.markdown("---")
 
-        # Tabela de dados
-        if mostrar_tabela:
-            st.markdown("### 📋 Tabela de Dados")
-            cols_exibir = ['Pontos'] + periodos_selecionados
-            st.dataframe(df_dia[cols_exibir].style.format({c: "{:.1f} °C" for c in periodos_selecionados}), use_container_width=True)
+# ---------------------------------------------------------------------------
+# ÁREA DE TRABALHO: TABELA E GRÁFICO LADO A LADO
+# ---------------------------------------------------------------------------
+col_tabela, col_grafico = st.columns([1, 1.2], gap="large")
 
-elif visualizacao == "Todos os Dias (Painel)":
-    st.subheader("Painel Comparativo - Todos os Dias")
-    st.markdown("Visualização sequencial dos três dias de medições no BOSQUE:")
+with col_tabela:
+    st.subheader("📋 Tabela de Dados (Editável)")
 
-    tabs = st.tabs(["14 de Agosto", "16 de Agosto", "19 de Agosto", "Painel Completo"])
+    t_col1, t_col2 = st.columns(2)
+    with t_col1:
+        titulo_dia_input = st.text_input("Título da Tabela:", value=st.session_state.titulo_dia)
+    with t_col2:
+        titulo_grafico_input = st.text_input("Título do Gráfico:", value=st.session_state.titulo_grafico)
 
-    for idx, (dia_key, tab) in enumerate(zip(["14", "16", "19"], tabs[:3])):
-        with tab:
-            info = DADOS[dia_key]
-            df = criar_dataframe(dia_key)
-            fig = render_grafico(df, info, ["Manha", "Tarde", "Noite"], com_marcadores)
-            st.pyplot(fig)
-            plt.close(fig)
+    if ajustar_escala:
+        e_col1, e_col2 = st.columns(2)
+        with e_col1:
+            min_y_val = st.number_input("Escala Y Mínima (°C):", value=float(st.session_state.min_y), step=1.0)
+        with e_col2:
+            max_y_val = st.number_input("Escala Y Máxima (°C):", value=float(st.session_state.max_y), step=1.0)
+    else:
+        min_y_val = None
+        max_y_val = None
 
-            if mostrar_tabela:
-                st.dataframe(df.style.format({c: "{:.1f} °C" for c in ["Manha", "Tarde", "Noite"]}), use_container_width=True)
+    st.caption("💡 *Dica: você pode clicar diretamente em qualquer célula abaixo para alterar o valor ou colar dados.*")
 
-    with tabs[3]:
-        painel_path = "graficos_gerados/graficos_todos_dias.png"
-        if os.path.exists(painel_path):
-            st.image(painel_path, caption="Painel Integrado - 14, 16 e 19 de Agosto", use_container_width=True)
-            with open(painel_path, "rb") as f:
-                st.download_button(
-                    label="📥 Baixar Painel Completo em PNG (300 DPI)",
-                    data=f.read(),
-                    file_name="graficos_todos_dias.png",
-                    mime="image/png"
-                )
+    # Editor de dados interativo no estilo Excel
+    df_editado = st.data_editor(
+        st.session_state.df_atual,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Pontos": st.column_config.TextColumn("Pontos", width="small", required=True),
+            "Manha": st.column_config.NumberColumn("Manha (°C)", format="%.1f", step=0.1),
+            "Tarde": st.column_config.NumberColumn("Tarde (°C)", format="%.1f", step=0.1),
+            "Noite": st.column_config.NumberColumn("Noite (°C)", format="%.1f", step=0.1),
+        },
+        height=390,
+        key="editor_principal"
+    )
 
-elif visualizacao == "Tabela Comparativa":
-    st.subheader("Resumo Estatístico por Período e Dia")
-    
-    resumo_list = []
-    for dia_key, info in DADOS.items():
-        df = criar_dataframe(dia_key)
-        for p in ["Manha", "Tarde", "Noite"]:
-            resumo_list.append({
-                "Dia": info["dia_nome"],
-                "Período": p,
-                "Média (°C)": round(df[p].mean(), 2),
-                "Mínima (°C)": round(df[p].min(), 2),
-                "Máxima (°C)": round(df[p].max(), 2),
-                "Amplitude (°C)": round(df[p].max() - df[p].min(), 2)
-            })
+with col_grafico:
+    st.subheader("📈 Gráfico em Tempo Real (Preview)")
 
-    df_resumo = pd.DataFrame(resumo_list)
-    st.dataframe(df_resumo, use_container_width=True)
+    # Gera a figura sincronizada com os dados editados
+    fig_preview = gerar_figura_matplotlib(
+        df=df_editado,
+        titulo_grafico=titulo_grafico_input,
+        min_y=min_y_val,
+        max_y=max_y_val,
+        com_marcadores=opt_marcadores
+    )
+    st.pyplot(fig_preview)
+
+    # -----------------------------------------------------------------------
+    # BOTÕES DE EXPORTAÇÃO E DOWNLOAD
+    # -----------------------------------------------------------------------
+    st.markdown("##### 📥 Opções de Exportação:")
+    btn_col1, btn_col2, btn_col3 = st.columns(3)
+
+    # 1. Download PNG 300 DPI
+    buf_png = io.BytesIO()
+    fig_preview.savefig(buf_png, format="png", dpi=300, bbox_inches="tight")
+    btn_col1.download_button(
+        label="🖼️ Baixar Gráfico PNG (300 DPI)",
+        data=buf_png.getvalue(),
+        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_grafico.png",
+        mime="image/png",
+        use_container_width=True
+    )
+
+    # 2. Download PDF Vetorial
+    buf_pdf = io.BytesIO()
+    fig_preview.savefig(buf_pdf, format="pdf", bbox_inches="tight")
+    btn_col2.download_button(
+        label="📄 Baixar Gráfico em PDF",
+        data=buf_pdf.getvalue(),
+        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_grafico.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+
+    # 3. Download Planilha Excel Completa (.xlsx)
+    excel_bytes = gerar_excel_bytes(
+        df=df_editado,
+        titulo_dia=titulo_dia_input,
+        titulo_grafico=titulo_grafico_input,
+        min_y=min_y_val,
+        max_y=max_y_val
+    )
+    btn_col3.download_button(
+        label="📊 Exportar para Excel (.xlsx)",
+        data=excel_bytes,
+        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_com_grafico.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+    plt.close(fig_preview)
+
+# ---------------------------------------------------------------------------
+# RESUMO ESTATÍSTICO INFORMATIVO
+# ---------------------------------------------------------------------------
+st.markdown("---")
+with st.expander("📊 Ver Resumo Estatístico dos Dados Atuais", expanded=False):
+    s_col1, s_col2, s_col3 = st.columns(3)
+    for idx, (periodo, s_col) in enumerate(zip(['Manha', 'Tarde', 'Noite'], [s_col1, s_col2, s_col3])):
+        if periodo in df_editado.columns:
+            serie = pd.to_numeric(df_editado[periodo], errors='coerce').dropna()
+            if not serie.empty:
+                s_col.markdown(f"#### Período: **{periodo}**")
+                s_col.write(f"- **Média:** {serie.mean():.2f} °C")
+                s_col.write(f"- **Mínima:** {serie.min():.2f} °C")
+                s_col.write(f"- **Máxima:** {serie.max():.2f} °C")
+                s_col.write(f"- **Amplitude:** {(serie.max() - serie.min()):.2f} °C")
