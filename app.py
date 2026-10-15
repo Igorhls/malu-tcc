@@ -19,10 +19,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização CSS para interface séria, acadêmica e limpa
+# Estilização CSS institucional
 st.markdown("""
 <style>
-    /* Tipografia institucional */
     body, [class*="css"] {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
@@ -40,25 +39,14 @@ st.markdown("""
         border-bottom: 1px solid #e2e8f0;
         padding-bottom: 0.6rem;
     }
-    /* Estilo de cartões e blocos formais */
     div[data-testid="stExpander"] {
         border: 1px solid #cbd5e1;
         border-radius: 4px;
         background-color: #fafafa;
     }
-    /* Botões formais */
     button[kind="primary"], button[kind="secondary"] {
         border-radius: 3px !important;
         font-weight: 500 !important;
-    }
-    /* Ajuste de abas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        padding-top: 6px;
-        padding-bottom: 6px;
-        font-size: 0.95rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -165,14 +153,14 @@ def sanitizar_dados_tabela(df):
 
 
 def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
-                            min_y, max_y, cores_periodos, estilos_linhas,
-                            fonte_nome, tamanho_fonte, espessura_linha,
-                            com_marcadores, estilo_moldura, exibir_grade):
+                            min_y, max_y, series_ativas, cores_periodos, estilos_linhas,
+                            fonte_nome, tamanho_fonte, espessura_linha, com_marcadores,
+                            bordas_config, ticks_config, legenda_config, exibir_grade):
     """
-    Renderiza a figura do Matplotlib com controle estrito de tipografia acadêmica,
-    cores, espessuras e layout científico.
+    Renderiza a figura do Matplotlib com controle milimétrico de tipografia,
+    cores, linhas visíveis, bordas do quadro e posicionamento livre da legenda.
     """
-    # 1. Configuração estrita de Tipografia
+    # 1. Configuração de Tipografia
     if "Times" in fonte_nome:
         plt.rcParams['font.serif'] = ['Times New Roman', 'Times', 'DejaVu Serif', 'serif']
         plt.rcParams['font.family'] = 'serif'
@@ -195,9 +183,9 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
 
     marcadores_map = {'Manha': 'o', 'Tarde': 's', 'Noite': '^'}
 
-    # 2. Plotagem das linhas
+    # 2. Plotagem das linhas (apenas as séries ativas marcadas pela usuária)
     for periodo in ['Manha', 'Tarde', 'Noite']:
-        if periodo in df.columns:
+        if periodo in df.columns and periodo in series_ativas:
             m = marcadores_map[periodo] if com_marcadores else None
             ls = estilos_linhas.get(periodo, '-')
             cor = cores_periodos.get(periodo, '#000000')
@@ -214,13 +202,13 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
                 markerfacecolor='white' if com_marcadores and "Monocromático" in str(cores_periodos) else cor
             )
 
-    # 3. Escalas e Limites
+    # 3. Escalas e Limites dos Eixos
     ax.set_xticks(x_indices)
     ax.set_xticklabels(pontos, fontsize=tamanho_fonte - 0.5)
 
     todas_temps = []
     for col in ['Manha', 'Tarde', 'Noite']:
-        if col in df.columns:
+        if col in df.columns and col in series_ativas:
             todas_temps.extend(pd.to_numeric(df[col], errors='coerce').dropna().tolist())
 
     if todas_temps:
@@ -232,55 +220,81 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
             pad_max = pad_min + 2
         ax.set_ylim(pad_min, pad_max)
 
-    # 4. Estilos de Moldura
-    if estilo_moldura == "OriginLab Pro (Moldura Fechada + Ticks Internos)":
-        for spine in ax.spines.values():
-            spine.set_color('black')
-            spine.set_linewidth(1.15)
-            spine.set_visible(True)
+    if len(x_indices) > 0:
+        ax.set_xlim(-0.55, len(x_indices) - 0.45)
 
-        ax.tick_params(which='major', direction='in', top=True, right=True, length=6, width=1.1, color='black', labelsize=tamanho_fonte - 0.5)
-        ax.tick_params(which='minor', direction='in', top=True, right=True, length=3.5, width=0.8, color='black')
+    # 4. Controle das Bordas (Spines)
+    cor_borda = bordas_config.get('cor', 'black')
+    esp_borda = bordas_config.get('espessura', 1.15)
 
-        if len(x_indices) > 0:
-            ax.set_xlim(-0.55, len(x_indices) - 0.45)
+    ax.spines['top'].set_visible(bordas_config.get('topo', True))
+    ax.spines['right'].set_visible(bordas_config.get('direita', True))
+    ax.spines['bottom'].set_visible(bordas_config.get('baixo', True))
+    ax.spines['left'].set_visible(bordas_config.get('esquerda', True))
 
+    for s_name in ['top', 'right', 'bottom', 'left']:
+        ax.spines[s_name].set_color(cor_borda)
+        ax.spines[s_name].set_linewidth(esp_borda)
+
+    # 5. Controle dos Ticks (Traços de Escala)
+    direcao_t = ticks_config.get('direcao', 'in')
+    ticks_topo = ticks_config.get('topo', True) and bordas_config.get('topo', True)
+    ticks_dir = ticks_config.get('direita', True) and bordas_config.get('direita', True)
+    ticks_baixo = ticks_config.get('baixo', True) and bordas_config.get('baixo', True)
+    ticks_esq = ticks_config.get('esquerda', True) and bordas_config.get('esquerda', True)
+
+    ax.tick_params(
+        which='major', direction=direcao_t,
+        top=ticks_topo, right=ticks_dir, bottom=ticks_baixo, left=ticks_esq,
+        length=5.5, width=1.1, color=cor_borda, labelsize=tamanho_fonte - 0.5
+    )
+
+    if ticks_config.get('minor_ticks', True):
         ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
         ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
-        ax.grid(exibir_grade, color='#e0e0e0', linestyle='--', linewidth=0.6)
-
-        # Legenda retangular clássica no topo direito
-        leg = ax.legend(
-            loc='upper right', frameon=True,
-            edgecolor='black', facecolor='white', framealpha=1.0,
-            fontsize=tamanho_fonte - 1.5, handlelength=1.8, handletextpad=0.5, borderpad=0.55
+        ax.tick_params(
+            which='minor', direction=direcao_t,
+            top=ticks_topo, right=ticks_dir, bottom=ticks_baixo, left=ticks_esq,
+            length=3.2, width=0.8, color=cor_borda
         )
-        leg.get_frame().set_linewidth(1.0)
-
-    else:  # Padrão Aberto (Excel / Editorial)
-        for s in ['top', 'right', 'left']:
-            ax.spines[s].set_visible(False)
-        ax.spines['bottom'].set_color('#b0b0b0')
-        ax.spines['bottom'].set_linewidth(0.9)
-
-        ax.tick_params(axis='y', which='both', length=0, labelsize=tamanho_fonte - 0.5, labelcolor='#333333')
-        ax.tick_params(axis='x', which='both', length=3, color='#b0b0b0', labelsize=tamanho_fonte - 0.5, labelcolor='#333333')
+    else:
         ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
-        ax.grid(axis='y', visible=exibir_grade, color='#e6e6e6', linestyle='-', linewidth=0.8)
-        ax.grid(axis='x', visible=False)
 
-        leg = ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15),
-                        ncol=3, frameon=False, fontsize=tamanho_fonte - 1.0,
-                        handlelength=1.6, handletextpad=0.5, columnspacing=1.6)
+    ax.grid(exibir_grade, color='#e0e0e0', linestyle='--', linewidth=0.6)
 
-    # 5. Rótulos e Título
+    # 6. Rótulos e Título
     ax.set_xlabel(rotulo_x, fontsize=tamanho_fonte, color='black', labelpad=8)
     ax.set_ylabel(rotulo_y, fontsize=tamanho_fonte, color='black', labelpad=8)
 
     if titulo_grafico and titulo_grafico.strip():
-        pad_val = 14 if estilo_moldura.startswith("OriginLab") else 24
+        pad_val = 12 if bordas_config.get('topo', True) else 22
         ax.set_title(titulo_grafico, fontsize=tamanho_fonte + 1.5, color='black', pad=pad_val, fontweight='normal')
+
+    # 7. Posicionamento e Customização Livre da Legenda (Arrastável / Coordenadas)
+    if legenda_config.get('exibir', True) and len(series_ativas) > 0:
+        pos_x = legenda_config.get('pos_x', 0.98)
+        pos_y = legenda_config.get('pos_y', 0.98)
+        loc_ancora = legenda_config.get('loc', 'upper right')
+        ncol_leg = len(series_ativas) if legenda_config.get('orientacao') == 'Horizontal' else 1
+        moldura_leg = legenda_config.get('moldura', True)
+
+        leg = ax.legend(
+            loc=loc_ancora,
+            bbox_to_anchor=(pos_x, pos_y),
+            ncol=ncol_leg,
+            frameon=moldura_leg,
+            edgecolor='black' if moldura_leg else 'none',
+            facecolor='white',
+            framealpha=1.0,
+            fontsize=tamanho_fonte - 1.5,
+            handlelength=1.8,
+            handletextpad=0.5,
+            borderpad=0.55,
+            columnspacing=1.5
+        )
+        if moldura_leg:
+            leg.get_frame().set_linewidth(1.0)
 
     plt.tight_layout()
     return fig
@@ -377,10 +391,8 @@ with st.sidebar:
             "Garamond (Clássico Acadêmico)",
             "Calibri (Sans-serif Moderna)"
         ],
-        index=0,
-        help="A norma ABNT e a maioria das bancas acadêmicas recomendam Times New Roman ou Arial."
+        index=0
     )
-
     tamanho_fonte = st.slider("Tamanho da Fonte:", min_value=9.0, max_value=14.0, value=11.0, step=0.5)
 
     st.markdown("---")
@@ -404,16 +416,7 @@ with st.sidebar:
         cores_selecionadas = PALETAS[opcao_paleta]
 
     st.markdown("---")
-    st.markdown("#### **Propriedades Gráficas**")
-    estilo_moldura = st.selectbox(
-        "Estilo da Moldura / Ticks:",
-        [
-            "OriginLab Pro (Moldura Fechada + Ticks Internos)",
-            "Editorial Aberto (Sem bordas superiores/laterais)"
-        ],
-        index=0
-    )
-
+    st.markdown("#### **Traços e Marcadores**")
     espessura_linha = st.slider("Espessura do Traço (pt):", min_value=0.8, max_value=2.8, value=1.2, step=0.1)
 
     col_opt1, col_opt2 = st.columns(2)
@@ -423,9 +426,9 @@ with st.sidebar:
         exibir_grade = st.checkbox("Linhas de grade", value=False)
 
     com_linhas_distintas = st.checkbox(
-        "Estilos de linha distintos (Sólido / Tracejado / Pontilhado)",
+        "Linhas distintas (Sólido / Tracejado / Pontilhado)",
         value=False,
-        help="Excelente para publicações e impressões acadêmicas em preto e branco."
+        help="Ideal para impressões acadêmicas em preto e branco."
     )
     if com_linhas_distintas:
         estilos_linhas = {"Manha": "-", "Tarde": "--", "Noite": ":"}
@@ -670,9 +673,130 @@ with col_tabela:
         df_editado = df_sanitizado
 
 with col_grafico:
-    st.markdown(f"#### Visualização Gráfica — Padrão {opcao_fonte.split('(')[0].strip()}")
+    # -----------------------------------------------------------------------
+    # CONTROLE DE SÉRIES ATIVAS (QUAIS LINHAS APARECEM NO GRÁFICO)
+    # -----------------------------------------------------------------------
+    st.markdown("#### Visualização Gráfica Interativa")
+    
+    col_ser_label, col_ser_m, col_ser_t, col_ser_n = st.columns([1.5, 1, 1, 1])
+    with col_ser_label:
+        st.markdown("**Séries visíveis:**")
+    with col_ser_m:
+        show_manha = st.checkbox("Manhã", value=True)
+    with col_ser_t:
+        show_tarde = st.checkbox("Tarde", value=True)
+    with col_ser_n:
+        show_noite = st.checkbox("Noite", value=True)
 
-    # Renderização da figura com todos os parâmetros customizados
+    series_ativas = []
+    if show_manha: series_ativas.append("Manha")
+    if show_tarde: series_ativas.append("Tarde")
+    if show_noite: series_ativas.append("Noite")
+
+    # -----------------------------------------------------------------------
+    # CONFIGURAÇÕES AVANÇADAS: LEGENDA (POSIÇÃO LIVRE / ARRASTAR) E BORDAS
+    # -----------------------------------------------------------------------
+    with st.expander("📍 **Posicionamento da Legenda (Arrastar / Ajustar Posição e Formato)**", expanded=False):
+        c_leg1, c_leg2 = st.columns(2)
+        with c_leg1:
+            exibir_legenda = st.checkbox("Exibir legenda", value=True)
+            moldura_legenda = st.checkbox("Caixa de contorno na legenda (Padrão OriginLab)", value=True)
+            orientacao_leg = st.radio("Orientação dos itens:", ["Vertical (Empilhados)", "Horizontal (Lado a lado)"], index=0)
+        with c_leg2:
+            posicao_preset = st.selectbox(
+                "Posição Rápida:",
+                [
+                    "Superior Direito (Interno)",
+                    "Superior Esquerdo (Interno)",
+                    "Inferior Direito (Interno)",
+                    "Inferior Esquerdo (Interno)",
+                    "Centro Superior (Externo)",
+                    "Lateral Direita (Externo)",
+                    "Personalizada (Sliders X/Y)"
+                ],
+                index=0
+            )
+
+        # Mapeamento ou ajuste milimétrico dos sliders
+        if posicao_preset == "Superior Direito (Interno)":
+            pad_x, pad_y, loc_ancora = 0.98, 0.98, 'upper right'
+        elif posicao_preset == "Superior Esquerdo (Interno)":
+            pad_x, pad_y, loc_ancora = 0.02, 0.98, 'upper left'
+        elif posicao_preset == "Inferior Direito (Interno)":
+            pad_x, pad_y, loc_ancora = 0.98, 0.05, 'lower right'
+        elif posicao_preset == "Inferior Esquerdo (Interno)":
+            pad_x, pad_y, loc_ancora = 0.02, 0.05, 'lower left'
+        elif posicao_preset == "Centro Superior (Externo)":
+            pad_x, pad_y, loc_ancora = 0.50, 1.15, 'upper center'
+        elif posicao_preset == "Lateral Direita (Externo)":
+            pad_x, pad_y, loc_ancora = 1.02, 0.50, 'center left'
+        else:
+            pad_x, pad_y, loc_ancora = 0.98, 0.98, 'upper right'
+
+        st.markdown("**Ajuste Milimétrico de Posição (Arraste os controles para mover a legenda):**")
+        slider_x_col, slider_y_col = st.columns(2)
+        with slider_x_col:
+            leg_x = st.slider("Posição Horizontal (X):", min_value=-0.1, max_value=1.2, value=float(pad_x), step=0.01)
+        with slider_y_col:
+            leg_y = st.slider("Posição Vertical (Y):", min_value=-0.1, max_value=1.3, value=float(pad_y), step=0.01)
+
+        legenda_config = {
+            'exibir': exibir_legenda,
+            'pos_x': leg_x,
+            'pos_y': leg_y,
+            'loc': loc_ancora,
+            'orientacao': orientacao_leg.split(' ')[0],
+            'moldura': moldura_legenda
+        }
+
+    with st.expander("📐 **Bordas e Ticks do Quadro (Escolher quais linhas aparecem)**", expanded=False):
+        st.markdown("**Quais bordas da moldura devem aparecer:**")
+        b_c1, b_c2, b_c3, b_c4 = st.columns(4)
+        with b_c1:
+            borda_top = st.checkbox("Borda Superior", value=True)
+        with b_c2:
+            borda_bottom = st.checkbox("Borda Inferior", value=True)
+        with b_c3:
+            borda_left = st.checkbox("Borda Esquerda", value=True)
+        with b_c4:
+            borda_right = st.checkbox("Borda Direita", value=True)
+
+        st.markdown("**Quais traços de escala (ticks) devem aparecer:**")
+        t_c1, t_c2, t_c3 = st.columns(3)
+        with t_c1:
+            ticks_topo = st.checkbox("Ticks no Topo", value=True)
+            ticks_dir = st.checkbox("Ticks na Direita", value=True)
+        with t_c2:
+            ticks_baixo = st.checkbox("Ticks na Base", value=True)
+            ticks_esq = st.checkbox("Ticks na Esquerda", value=True)
+        with t_c3:
+            direcao_ticks = st.radio("Direção dos traços:", ["Para dentro (in)", "Para fora (out)"], index=0)
+            minor_ticks = st.checkbox("Traços menores (minor ticks)", value=True)
+
+        cor_moldura = st.color_picker("Cor das Bordas:", value="#000000")
+        esp_moldura = st.slider("Espessura das Bordas (pt):", min_value=0.5, max_value=2.5, value=1.15, step=0.05)
+
+        bordas_config = {
+            'topo': borda_top,
+            'baixo': borda_bottom,
+            'esquerda': borda_left,
+            'direita': borda_right,
+            'cor': cor_moldura,
+            'espessura': esp_moldura
+        }
+
+        ticks_config = {
+            'topo': ticks_topo,
+            'direita': ticks_dir,
+            'baixo': ticks_baixo,
+            'esquerda': ticks_esq,
+            'direcao': 'in' if 'dentro' in direcao_ticks else 'out',
+            'minor_ticks': minor_ticks
+        }
+
+    # -----------------------------------------------------------------------
+    # RENDERIZAÇÃO DO GRÁFICO
+    # -----------------------------------------------------------------------
     fig_preview = gerar_figura_matplotlib(
         df=df_editado,
         titulo_grafico=titulo_grafico_input,
@@ -680,13 +804,16 @@ with col_grafico:
         rotulo_y=rotulo_y_input,
         min_y=min_y_val,
         max_y=max_y_val,
+        series_ativas=series_ativas,
         cores_periodos=cores_selecionadas,
         estilos_linhas=estilos_linhas,
         fonte_nome=opcao_fonte,
         tamanho_fonte=tamanho_fonte,
         espessura_linha=espessura_linha,
         com_marcadores=com_marcadores,
-        estilo_moldura=estilo_moldura,
+        bordas_config=bordas_config,
+        ticks_config=ticks_config,
+        legenda_config=legenda_config,
         exibir_grade=exibir_grade
     )
     st.pyplot(fig_preview)
@@ -697,7 +824,6 @@ with col_grafico:
     st.markdown("##### Exportar Resultados:")
     btn_col1, btn_col2, btn_col3 = st.columns(3)
 
-    # 1. Download PNG 300 DPI
     buf_png = io.BytesIO()
     fig_preview.savefig(buf_png, format="png", dpi=300, bbox_inches="tight")
     btn_col1.download_button(
@@ -708,7 +834,6 @@ with col_grafico:
         use_container_width=True
     )
 
-    # 2. Download PDF Vetorial
     buf_pdf = io.BytesIO()
     fig_preview.savefig(buf_pdf, format="pdf", bbox_inches="tight")
     btn_col2.download_button(
@@ -719,7 +844,6 @@ with col_grafico:
         use_container_width=True
     )
 
-    # 3. Download Planilha Excel
     excel_bytes = gerar_excel_bytes(
         df=df_editado,
         titulo_dia=titulo_dia_input,
@@ -744,7 +868,7 @@ st.markdown("---")
 with st.expander("Sumário Estatístico Descritivo das Medições", expanded=False):
     s_col1, s_col2, s_col3 = st.columns(3)
     for idx, (periodo, s_col) in enumerate(zip(['Manha', 'Tarde', 'Noite'], [s_col1, s_col2, s_col3])):
-        if periodo in df_editado.columns:
+        if periodo in df_editado.columns and periodo in series_ativas:
             serie = pd.to_numeric(df_editado[periodo], errors='coerce').dropna()
             if not serie.empty:
                 s_col.markdown(f"**Série: {periodo}**")
