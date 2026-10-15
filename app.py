@@ -13,7 +13,7 @@ from openpyxl.chart import LineChart, Reference
 # CONFIGURAÇÃO GERAL E ESTILO VZN
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="VZN EcoClima - Gerador de Tabelas e Gráficos",
+    page_title="VZN EcoClima - Studio de Análise Térmica",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -72,6 +72,43 @@ PRESETS = {
         })
     }
 }
+
+
+def sanitizar_dados_tabela(df):
+    """
+    Corrige automaticamente os erros clássicos de colagem do Excel em português:
+    1. Vírgula que virou zero/centena ao colar (ex: 27,4 -> 274.0 vira 27.4).
+    2. Valores None/vazios na coluna Pontos quando linhas extras são coladas.
+    """
+    modificado = False
+    df_novo = df.copy()
+
+    # 1. Garantir que a coluna Pontos não tenha valores None/vazios
+    for idx in range(len(df_novo)):
+        val_ponto = df_novo.iloc[idx]['Pontos']
+        if pd.isna(val_ponto) or str(val_ponto).strip().lower() in ['none', 'nan', '']:
+            df_novo.iloc[idx, df_novo.columns.get_loc('Pontos')] = f"P{idx + 1}"
+            modificado = True
+
+    # 2. Corrigir números onde a vírgula foi engolida pelo navegador (ex: 274.0 -> 27.4)
+    for col in ['Manha', 'Tarde', 'Noite']:
+        if col in df_novo.columns:
+            for idx in range(len(df_novo)):
+                val = df_novo.iloc[idx][col]
+                if pd.notnull(val):
+                    try:
+                        v_float = float(val)
+                        # Valores entre 60.0 e 600.0 são temperaturas sem vírgula (ex: 274.0 -> 27.4)
+                        if 60.0 < v_float <= 600.0:
+                            df_novo.iloc[idx, df_novo.columns.get_loc(col)] = round(v_float / 10.0, 1)
+                            modificado = True
+                        elif 600.0 < v_float <= 6000.0:
+                            df_novo.iloc[idx, df_novo.columns.get_loc(col)] = round(v_float / 100.0, 1)
+                            modificado = True
+                    except (ValueError, TypeError):
+                        pass
+
+    return df_novo, modificado
 
 
 def gerar_figura_matplotlib(df, titulo_grafico, min_y=None, max_y=None, com_marcadores=False):
@@ -229,7 +266,7 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.subheader("📁 Importar Planilha")
+    st.subheader("📁 Importar Arquivo de Planilha")
     uploaded_file = st.file_uploader(
         "Carregar arquivo (.xlsx ou .csv):",
         type=["xlsx", "csv"],
@@ -244,6 +281,9 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # INICIALIZAÇÃO DO ESTADO DA SESSÃO (SESSION STATE)
 # ---------------------------------------------------------------------------
+if "editor_version" not in st.session_state:
+    st.session_state.editor_version = 0
+
 if "ultimo_preset" not in st.session_state:
     st.session_state.ultimo_preset = "Dia 14 de Agosto"
     st.session_state.titulo_dia = PRESETS["Dia 14 de Agosto"]["titulo_dia"]
@@ -255,6 +295,7 @@ if "ultimo_preset" not in st.session_state:
 # Se o usuário trocou o preset no seletor
 if preset_escolhido != st.session_state.ultimo_preset:
     st.session_state.ultimo_preset = preset_escolhido
+    st.session_state.editor_version += 1
     if preset_escolhido in PRESETS:
         p = PRESETS[preset_escolhido]
         st.session_state.titulo_dia = p["titulo_dia"]
@@ -282,7 +323,6 @@ if uploaded_file is not None:
         else:
             df_up = pd.read_excel(uploaded_file)
 
-        # Mapeamento de colunas flexível (com/sem acento)
         col_map = {}
         for c in df_up.columns:
             c_clean = str(c).strip().lower()
@@ -299,6 +339,7 @@ if uploaded_file is not None:
         colunas_necessarias = ['Pontos', 'Manha', 'Tarde', 'Noite']
         if all(c in df_up.columns for c in colunas_necessarias):
             st.session_state.df_atual = df_up[colunas_necessarias].copy()
+            st.session_state.editor_version += 1
             nome_base = os.path.splitext(uploaded_file.name)[0]
             st.session_state.titulo_dia = nome_base
             st.session_state.titulo_grafico = f"{nome_base.upper()} - BOSQUE"
@@ -313,7 +354,7 @@ if uploaded_file is not None:
 # ---------------------------------------------------------------------------
 st.title("🌿 VZN EcoClima — Studio de Análise Térmica")
 st.markdown(
-    "Edite os valores na **tabela à esquerda** (ou importe sua planilha) e veja o **gráfico ao lado atualizando instantaneamente em tempo real**."
+    "Edite os valores na **tabela à esquerda** (ou cole direto do Excel) e veja o **gráfico ao lado atualizando instantaneamente em tempo real**."
 )
 st.markdown("---")
 
@@ -324,6 +365,89 @@ col_tabela, col_grafico = st.columns([1, 1.2], gap="large")
 
 with col_tabela:
     st.subheader("📋 Tabela de Dados (Editável)")
+
+    # Ferramenta para Colar Direto do Excel sem erro de vírgula
+    with st.expander("📋 **Colar Dados do Excel (Ctrl+C no Excel -> Ctrl+V aqui)**", expanded=False):
+        st.caption("Copie as células no Excel e cole no campo abaixo. As vírgulas são convertidas automaticamente!")
+        
+        destino_colar = st.selectbox(
+            "Onde colar?",
+            ["Apenas Manhã", "Apenas Tarde", "Apenas Noite", "Manhã, Tarde e Noite (3 colunas)", "Tabela Completa (Pontos + 3 colunas)"]
+        )
+        texto_colado = st.text_area("Cole aqui (Ctrl+V):", height=90, placeholder="Exemplo:\n27,4\n28,0\n27,6\n...")
+
+        if st.button("📥 Aplicar Dados na Tabela", use_container_width=True):
+            if texto_colado.strip():
+                linhas_raw = [l.strip() for l in texto_colado.strip().split('\n') if l.strip()]
+                df_temp = st.session_state.df_atual.copy()
+
+                if destino_colar in ["Apenas Manhã", "Apenas Tarde", "Apenas Noite"]:
+                    col_alvo = "Manha" if "Manhã" in destino_colar else ("Tarde" if "Tarde" in destino_colar else "Noite")
+                    valores = []
+                    for l in linhas_raw:
+                        val_str = l.replace(',', '.').strip()
+                        try:
+                            v = float(val_str)
+                            if 60.0 < v <= 600.0:
+                                v = v / 10.0
+                            valores.append(v)
+                        except ValueError:
+                            valores.append(np.nan)
+
+                    # Ajustar tamanho do DataFrame se necessário
+                    if len(valores) > len(df_temp):
+                        linhas_extras = len(valores) - len(df_temp)
+                        novos_pontos = [f"P{len(df_temp) + i + 1}" for i in range(linhas_extras)]
+                        df_extra = pd.DataFrame({'Pontos': novos_pontos, 'Manha': [np.nan]*linhas_extras, 'Tarde': [np.nan]*linhas_extras, 'Noite': [np.nan]*linhas_extras})
+                        df_temp = pd.concat([df_temp, df_extra], ignore_index=True)
+
+                    for i, v in enumerate(valores):
+                        df_temp.at[i, col_alvo] = v
+
+                elif destino_colar == "Manhã, Tarde e Noite (3 colunas)":
+                    novas_linhas = []
+                    for l in linhas_raw:
+                        partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
+                        nums = []
+                        for p in partes[:3]:
+                            try:
+                                v = float(p)
+                                if 60.0 < v <= 600.0:
+                                    v = v / 10.0
+                                nums.append(v)
+                            except ValueError:
+                                nums.append(np.nan)
+                        while len(nums) < 3:
+                            nums.append(np.nan)
+                        novas_linhas.append(nums)
+
+                    df_temp = pd.DataFrame(novas_linhas, columns=['Manha', 'Tarde', 'Noite'])
+                    df_temp.insert(0, 'Pontos', [f"P{i+1}" for i in range(len(df_temp))])
+
+                elif destino_colar == "Tabela Completa (Pontos + 3 colunas)":
+                    novas_linhas = []
+                    for l in linhas_raw:
+                        partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
+                        ponto_nome = partes[0]
+                        nums = []
+                        for p in partes[1:4]:
+                            try:
+                                v = float(p)
+                                if 60.0 < v <= 600.0:
+                                    v = v / 10.0
+                                nums.append(v)
+                            except ValueError:
+                                nums.append(np.nan)
+                        while len(nums) < 3:
+                            nums.append(np.nan)
+                        novas_linhas.append([ponto_nome] + nums)
+
+                    df_temp = pd.DataFrame(novas_linhas, columns=['Pontos', 'Manha', 'Tarde', 'Noite'])
+
+                st.session_state.df_atual = df_temp
+                st.session_state.editor_version += 1
+                st.success("Dados colados com sucesso e vírgulas convertidas!")
+                st.rerun()
 
     t_col1, t_col2 = st.columns(2)
     with t_col1:
@@ -341,10 +465,24 @@ with col_tabela:
         min_y_val = None
         max_y_val = None
 
-    st.caption("💡 *Dica: você pode clicar diretamente em qualquer célula abaixo para alterar o valor ou colar dados.*")
+    # Botões auxiliares rápidos
+    b_col1, b_col2 = st.columns(2)
+    if b_col1.button("🔄 Renumerar Pontos (P1..Pn)", use_container_width=True):
+        st.session_state.df_atual['Pontos'] = [f"P{i+1}" for i in range(len(st.session_state.df_atual))]
+        st.session_state.editor_version += 1
+        st.rerun()
 
-    # Editor de dados interativo no estilo Excel
-    df_editado = st.data_editor(
+    if b_col2.button("🪄 Corrigir Vírgulas/Zeros", use_container_width=True, help="Divide por 10 automaticamente qualquer valor > 60°C (ex: 274 -> 27.4)"):
+        df_corr, _ = sanitizar_dados_tabela(st.session_state.df_atual)
+        st.session_state.df_atual = df_corr
+        st.session_state.editor_version += 1
+        st.rerun()
+
+    st.caption("💡 *Dica: você pode colar células diretamente aqui. Se o navegador engolir a vírgula (ex: 27,4 virar 274), o sistema corrige sozinho automaticamente!*")
+
+    # Editor de dados interativo com chave versionada
+    editor_key = f"editor_principal_{st.session_state.editor_version}"
+    df_bruto = st.data_editor(
         st.session_state.df_atual,
         num_rows="dynamic",
         use_container_width=True,
@@ -354,9 +492,19 @@ with col_tabela:
             "Tarde": st.column_config.NumberColumn("Tarde (°C)", format="%.1f", step=0.1),
             "Noite": st.column_config.NumberColumn("Noite (°C)", format="%.1f", step=0.1),
         },
-        height=390,
-        key="editor_principal"
+        height=380,
+        key=editor_key
     )
+
+    # Auto-correção em tempo real se a usuária colar números com vírgula do Excel que o browser transformou em centena (ex: 274 -> 27.4)
+    df_sanitizado, foi_corrigido = sanitizar_dados_tabela(df_bruto)
+    if foi_corrigido:
+        st.session_state.df_atual = df_sanitizado
+        st.session_state.editor_version += 1
+        st.toast("🪄 Vírgula do Excel corrigida automaticamente (ex: 274 -> 27.4)!", icon="✨")
+        st.rerun()
+    else:
+        df_editado = df_sanitizado
 
 with col_grafico:
     st.subheader("📈 Gráfico em Tempo Real (Preview)")
