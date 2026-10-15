@@ -1,4 +1,4 @@
-# Monitoramento Microclimático - BOSQUE (TCC)
+# 🌿 VZN EcoClima — Monitoramento Microclimático (TCC)
 
 Aplicação e scripts em Python para visualização, análise e exportação de dados de temperatura do ar por pontos amostrais (**P1 a P10**) para os períodos **Manhã**, **Tarde** e **Noite** nos dias:
 - **14 de agosto**

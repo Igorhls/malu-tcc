@@ -33,7 +33,7 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.edgecolor'] = COR_BORDA
 plt.rcParams['axes.linewidth'] = 0.8
 
-# Dados pré-carregados padrão (modelo de Malu)
+# Dados pré-carregados padrão
 PRESETS = {
     "Dia 14 de Agosto": {
         "titulo_dia": "Dia 14 de agosto",
@@ -311,7 +311,7 @@ if uploaded_file is not None:
 # ---------------------------------------------------------------------------
 # CABEÇALHO PRINCIPAL
 # ---------------------------------------------------------------------------
-st.title("🌿 VZN EcoClima — Painel Interativo de Malu")
+st.title("🌿 VZN EcoClima — Studio de Análise Térmica")
 st.markdown(
     "Edite os valores na **tabela à esquerda** (ou importe sua planilha) e veja o **gráfico ao lado atualizando instantaneamente em tempo real**."
 )
