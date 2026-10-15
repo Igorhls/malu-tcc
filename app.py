@@ -19,19 +19,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Paleta visual fiel ao modelo original
-COR_MANHA = '#265b79'   # Azul petróleo
-COR_TARDE = '#e27641'   # Laranja terracota
-COR_NOITE = '#236532'   # Verde escuro
-COR_TEXTO = '#595959'   # Cinza escuro para títulos e eixos
-COR_GRADE = '#e6e6e6'   # Cinza claro para linhas de grade
-COR_BORDA = '#d9d9d9'   # Cinza suave para contornos
+# Paletas de cores
+# 1. OriginLab Pro (Cores clássicas de publicação)
+COR_ORIGIN_MANHA = '#222222'  # Preto / Carvão
+COR_ORIGIN_TARDE = '#e74c3c'  # Vermelho clássico Origin
+COR_ORIGIN_NOITE = '#2980b9'  # Azul clássico Origin
 
-# Fontes
-plt.rcParams['font.sans-serif'] = ['Cambria', 'Times New Roman', 'DejaVu Serif', 'serif']
-plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['axes.edgecolor'] = COR_BORDA
-plt.rcParams['axes.linewidth'] = 0.8
+# 2. Excel Clássico
+COR_EXCEL_MANHA = '#265b79'   # Azul petróleo
+COR_EXCEL_TARDE = '#e27641'   # Laranja terracota
+COR_EXCEL_NOITE = '#236532'   # Verde escuro
+COR_TEXTO_EXCEL = '#595959'   # Cinza escuro
+COR_GRADE_EXCEL = '#e6e6e6'   # Cinza claro
+COR_BORDA_EXCEL = '#d9d9d9'   # Cinza suave
 
 # Dados pré-carregados padrão
 PRESETS = {
@@ -39,7 +39,7 @@ PRESETS = {
         "titulo_dia": "Dia 14 de agosto",
         "titulo_grafico": "DIA 14 DE AGOSTO - BOSQUE",
         "min_y": 24.0,
-        "max_y": 32.0,
+        "max_y": 33.0,
         "df": pd.DataFrame({
             'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
             'Manha': [26.2, 26.5, 26.5, 26.9, 27.2, 27.4, 27.1, 27.2, 27.3, 27.6],
@@ -51,7 +51,7 @@ PRESETS = {
         "titulo_dia": "Dia 16 de agosto",
         "titulo_grafico": "DIA 16 DE AGOSTO - BOSQUE",
         "min_y": 24.0,
-        "max_y": 32.0,
+        "max_y": 33.0,
         "df": pd.DataFrame({
             'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
             'Manha': [26.0, 25.3, 25.3, 26.6, 26.2, 25.5, 25.4, 26.2, 26.0, 26.3],
@@ -63,7 +63,7 @@ PRESETS = {
         "titulo_dia": "Dia 19 de agosto",
         "titulo_grafico": "DIA 19 DE AGOSTO - BOSQUE",
         "min_y": 22.0,
-        "max_y": 32.0,
+        "max_y": 33.0,
         "df": pd.DataFrame({
             'Pontos': ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
             'Manha': [24.7, 24.0, 23.4, 23.6, 23.8, 23.6, 23.5, 23.8, 24.2, 24.4],
@@ -98,7 +98,6 @@ def sanitizar_dados_tabela(df):
                 if pd.notnull(val):
                     try:
                         v_float = float(val)
-                        # Valores entre 60.0 e 600.0 são temperaturas sem vírgula (ex: 274.0 -> 27.4)
                         if 60.0 < v_float <= 600.0:
                             df_novo.iloc[idx, df_novo.columns.get_loc(col)] = round(v_float / 10.0, 1)
                             modificado = True
@@ -111,36 +110,48 @@ def sanitizar_dados_tabela(df):
     return df_novo, modificado
 
 
-def gerar_figura_matplotlib(df, titulo_grafico, min_y=None, max_y=None, com_marcadores=False):
-    """Gera a figura Matplotlib com estética idêntica ao modelo original."""
-    fig, ax = plt.subplots(figsize=(6.8, 3.6), dpi=200)
+def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x="Pontos", rotulo_y="Temperatura do ar (°C)",
+                            min_y=None, max_y=None, com_marcadores=False, estilo="OriginLab Pro"):
+    """
+    Gera a figura com o visual selecionado:
+    - 'OriginLab Pro': Quadro preto 4 lados, ticks para dentro em todos os eixos, sem grade, legenda com caixa no canto superior direito.
+    - 'Excel Clássico': Grade cinza suave, eixos abertos, legenda superior centralizada.
+    """
+    is_origin = (estilo == "OriginLab Pro")
+
+    if is_origin:
+        plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans', 'sans-serif']
+        cores = {'Manha': COR_ORIGIN_MANHA, 'Tarde': COR_ORIGIN_TARDE, 'Noite': COR_ORIGIN_NOITE}
+        lw = 1.15
+    else:
+        plt.rcParams['font.sans-serif'] = ['Cambria', 'Times New Roman', 'DejaVu Serif', 'serif']
+        cores = {'Manha': COR_EXCEL_MANHA, 'Tarde': COR_EXCEL_TARDE, 'Noite': COR_EXCEL_NOITE}
+        lw = 2.0
+
+    plt.rcParams['font.family'] = 'sans-serif'
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.2), dpi=200)
     fig.patch.set_facecolor('white')
     ax.set_facecolor('white')
 
     pontos = df['Pontos'].astype(str).tolist()
+    x_indices = np.arange(len(pontos))
+
     m_marker = 'o' if com_marcadores else None
     t_marker = 's' if com_marcadores else None
     n_marker = '^' if com_marcadores else None
 
     # Linhas dos períodos
     if 'Manha' in df.columns:
-        ax.plot(pontos, df['Manha'], label='Manha', color=COR_MANHA, linewidth=2.0, marker=m_marker, markersize=5)
+        ax.plot(x_indices, df['Manha'], label='Manha', color=cores['Manha'], linewidth=lw, marker=m_marker, markersize=5)
     if 'Tarde' in df.columns:
-        ax.plot(pontos, df['Tarde'], label='Tarde', color=COR_TARDE, linewidth=2.0, marker=t_marker, markersize=5)
+        ax.plot(x_indices, df['Tarde'], label='Tarde', color=cores['Tarde'], linewidth=lw, marker=t_marker, markersize=5)
     if 'Noite' in df.columns:
-        ax.plot(pontos, df['Noite'], label='Noite', color=COR_NOITE, linewidth=2.0, marker=n_marker, markersize=5)
+        ax.plot(x_indices, df['Noite'], label='Noite', color=cores['Noite'], linewidth=lw, marker=n_marker, markersize=5)
 
-    ax.set_title(titulo_grafico, fontsize=12, color=COR_TEXTO, pad=25)
-
-    leg = ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15),
-                    ncol=3, frameon=False, fontsize=9.5,
-                    handlelength=1.5, handletextpad=0.5, columnspacing=1.5)
-    if leg:
-        for text in leg.get_texts():
-            text.set_color(COR_TEXTO)
-
-    ax.set_ylabel("Temperatura do ar (°C)", fontsize=9.5, color=COR_TEXTO, labelpad=8)
-    ax.set_xlabel("Pontos", fontsize=9.5, color=COR_TEXTO, labelpad=8)
+    # Configuração dos eixos X e Y
+    ax.set_xticks(x_indices)
+    ax.set_xticklabels(pontos)
 
     # Configuração de limites Y
     todas_temps = []
@@ -156,19 +167,82 @@ def gerar_figura_matplotlib(df, titulo_grafico, min_y=None, max_y=None, com_marc
         if pad_max <= pad_min:
             pad_max = pad_min + 2
         ax.set_ylim(pad_min, pad_max)
+
+    # -----------------------------------------------------------------------
+    # ESTILIZAÇÃO ORIGINLAB PRO
+    # -----------------------------------------------------------------------
+    if is_origin:
+        # Moldura completa (4 lados pretos)
+        for spine in ax.spines.values():
+            spine.set_color('black')
+            spine.set_linewidth(1.1)
+            spine.set_visible(True)
+
+        # Ticks característicos do OriginLab: para DENTRO (in) e nos 4 LADOS
+        ax.tick_params(which='major', direction='in', top=True, right=True, length=6, width=1.1, color='black', labelsize=10.5)
+        ax.tick_params(which='minor', direction='in', top=True, right=True, length=3.5, width=0.8, color='black')
+
+        # Margens nos cantos X (para o primeiro e último ponto não colarem nos eixos)
+        if len(x_indices) > 0:
+            ax.set_xlim(-0.55, len(x_indices) - 0.45)
+
+        # Subdivisões (Minor Ticks)
+        ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+        ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+
+        # Sem linhas de grade
+        ax.grid(False)
+
+        # Rótulos
+        ax.set_xlabel(rotulo_x, fontsize=11, color='black', labelpad=7)
+        ax.set_ylabel(rotulo_y, fontsize=11, color='black', labelpad=7)
+
+        if titulo_grafico and titulo_grafico.strip():
+            ax.set_title(titulo_grafico, fontsize=11.5, color='black', pad=12, fontweight='normal')
+
+        # Legenda com moldura retangular preta no canto superior direito
+        leg = ax.legend(
+            loc='upper right',
+            frameon=True,
+            edgecolor='black',
+            facecolor='white',
+            framealpha=1.0,
+            fontsize=9.5,
+            handlelength=1.6,
+            handletextpad=0.5,
+            borderpad=0.6,
+            labelspacing=0.35
+        )
+        leg.get_frame().set_linewidth(1.0)
+
+    # -----------------------------------------------------------------------
+    # ESTILIZAÇÃO EXCEL CLÁSSICO
+    # -----------------------------------------------------------------------
+    else:
+        ax.set_title(titulo_grafico, fontsize=12, color=COR_TEXTO_EXCEL, pad=25)
+        leg = ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15),
+                        ncol=3, frameon=False, fontsize=9.5,
+                        handlelength=1.5, handletextpad=0.5, columnspacing=1.5)
+        if leg:
+            for text in leg.get_texts():
+                text.set_color(COR_TEXTO_EXCEL)
+
+        ax.set_ylabel(rotulo_y, fontsize=9.5, color=COR_TEXTO_EXCEL, labelpad=8)
+        ax.set_xlabel(rotulo_x, fontsize=9.5, color=COR_TEXTO_EXCEL, labelpad=8)
+
         ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+        ax.grid(axis='y', color=COR_GRADE_EXCEL, linestyle='-', linewidth=0.8)
+        ax.grid(axis='x', visible=False)
 
-    ax.grid(axis='y', color=COR_GRADE, linestyle='-', linewidth=0.8)
-    ax.grid(axis='x', visible=False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_color(COR_BORDA_EXCEL)
+        ax.spines['bottom'].set_linewidth(0.8)
 
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_color(COR_BORDA)
-    ax.spines['bottom'].set_linewidth(0.8)
-
-    ax.tick_params(axis='y', which='both', length=0, labelsize=9.5, labelcolor=COR_TEXTO)
-    ax.tick_params(axis='x', which='both', length=3, color=COR_BORDA, labelsize=9.5, labelcolor=COR_TEXTO)
+        ax.tick_params(axis='y', which='both', length=0, labelsize=9.5, labelcolor=COR_TEXTO_EXCEL)
+        ax.tick_params(axis='x', which='both', length=3, color=COR_BORDA_EXCEL, labelsize=9.5, labelcolor=COR_TEXTO_EXCEL)
 
     plt.tight_layout()
     return fig
@@ -259,6 +333,15 @@ with st.sidebar:
     st.caption("Studio de Visualização Microclimática • TCC")
     st.markdown("---")
 
+    st.subheader("🎨 Estilo do Gráfico")
+    estilo_selecionado = st.radio(
+        "Selecione o padrão visual:",
+        ["OriginLab Pro", "Excel Clássico"],
+        index=0,
+        help="OriginLab Pro: moldura 4 lados preta, ticks para dentro em todos os eixos, sem grade, ideal para artigos e teses."
+    )
+
+    st.markdown("---")
     st.subheader("⚡ Modelos Prontos")
     preset_escolhido = st.selectbox(
         "Carregar dados pré-definidos:",
@@ -274,7 +357,7 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.subheader("🎨 Opções Visuais")
+    st.subheader("⚙️ Configurações Visuais")
     opt_marcadores = st.checkbox("Exibir pontos/marcadores na linha", value=False)
     ajustar_escala = st.checkbox("Definir escala Y manualmente", value=True)
 
@@ -290,6 +373,8 @@ if "ultimo_preset" not in st.session_state:
     st.session_state.titulo_grafico = PRESETS["Dia 14 de Agosto"]["titulo_grafico"]
     st.session_state.min_y = PRESETS["Dia 14 de Agosto"]["min_y"]
     st.session_state.max_y = PRESETS["Dia 14 de Agosto"]["max_y"]
+    st.session_state.rotulo_x = "Pontos"
+    st.session_state.rotulo_y = "Temperatura do ar (°C)"
     st.session_state.df_atual = PRESETS["Dia 14 de Agosto"]["df"].copy()
 
 # Se o usuário trocou o preset no seletor
@@ -354,14 +439,14 @@ if uploaded_file is not None:
 # ---------------------------------------------------------------------------
 st.title("🌿 VZN EcoClima — Studio de Análise Térmica")
 st.markdown(
-    "Edite os valores na **tabela à esquerda** (ou cole direto do Excel) e veja o **gráfico ao lado atualizando instantaneamente em tempo real**."
+    "Edite os valores na **tabela à esquerda** e veja o **gráfico em estilo OriginLab Pro atualizando em tempo real ao lado**."
 )
 st.markdown("---")
 
 # ---------------------------------------------------------------------------
 # ÁREA DE TRABALHO: TABELA E GRÁFICO LADO A LADO
 # ---------------------------------------------------------------------------
-col_tabela, col_grafico = st.columns([1, 1.2], gap="large")
+col_tabela, col_grafico = st.columns([1, 1.25], gap="large")
 
 with col_tabela:
     st.subheader("📋 Tabela de Dados (Editável)")
@@ -394,7 +479,6 @@ with col_tabela:
                         except ValueError:
                             valores.append(np.nan)
 
-                    # Ajustar tamanho do DataFrame se necessário
                     if len(valores) > len(df_temp):
                         linhas_extras = len(valores) - len(df_temp)
                         novos_pontos = [f"P{len(df_temp) + i + 1}" for i in range(linhas_extras)]
@@ -455,6 +539,12 @@ with col_tabela:
     with t_col2:
         titulo_grafico_input = st.text_input("Título do Gráfico:", value=st.session_state.titulo_grafico)
 
+    r_col1, r_col2 = st.columns(2)
+    with r_col1:
+        rotulo_x_input = st.text_input("Nome do Eixo X:", value="Pontos")
+    with r_col2:
+        rotulo_y_input = st.text_input("Nome do Eixo Y:", value="Temperatura do ar (°C)")
+
     if ajustar_escala:
         e_col1, e_col2 = st.columns(2)
         with e_col1:
@@ -465,7 +555,7 @@ with col_tabela:
         min_y_val = None
         max_y_val = None
 
-    # Botões auxiliares rápidos
+    # Botões rápidos
     b_col1, b_col2 = st.columns(2)
     if b_col1.button("🔄 Renumerar Pontos (P1..Pn)", use_container_width=True):
         st.session_state.df_atual['Pontos'] = [f"P{i+1}" for i in range(len(st.session_state.df_atual))]
@@ -496,7 +586,7 @@ with col_tabela:
         key=editor_key
     )
 
-    # Auto-correção em tempo real se a usuária colar números com vírgula do Excel que o browser transformou em centena (ex: 274 -> 27.4)
+    # Auto-correção em tempo real se a usuária colar números com vírgula do Excel
     df_sanitizado, foi_corrigido = sanitizar_dados_tabela(df_bruto)
     if foi_corrigido:
         st.session_state.df_atual = df_sanitizado
@@ -507,15 +597,18 @@ with col_tabela:
         df_editado = df_sanitizado
 
 with col_grafico:
-    st.subheader("📈 Gráfico em Tempo Real (Preview)")
+    st.subheader(f"📈 Gráfico em Tempo Real ({estilo_selecionado})")
 
-    # Gera a figura sincronizada com os dados editados
+    # Gera a figura sincronizada com os dados editados no estilo escolhido
     fig_preview = gerar_figura_matplotlib(
         df=df_editado,
         titulo_grafico=titulo_grafico_input,
+        rotulo_x=rotulo_x_input,
+        rotulo_y=rotulo_y_input,
         min_y=min_y_val,
         max_y=max_y_val,
-        com_marcadores=opt_marcadores
+        com_marcadores=opt_marcadores,
+        estilo=estilo_selecionado
     )
     st.pyplot(fig_preview)
 
@@ -531,7 +624,7 @@ with col_grafico:
     btn_col1.download_button(
         label="🖼️ Baixar Gráfico PNG (300 DPI)",
         data=buf_png.getvalue(),
-        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_grafico.png",
+        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_{estilo_selecionado.lower().replace(' ', '_')}.png",
         mime="image/png",
         use_container_width=True
     )
@@ -542,7 +635,7 @@ with col_grafico:
     btn_col2.download_button(
         label="📄 Baixar Gráfico em PDF",
         data=buf_pdf.getvalue(),
-        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_grafico.pdf",
+        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_{estilo_selecionado.lower().replace(' ', '_')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
