@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
-from openpyxl.chart import LineChart, Reference
+from openpyxl.chart import LineChart, BarChart, Reference
 
 # ---------------------------------------------------------------------------
 # CONFIGURAÇÃO GERAL E ESTILO SÓBRIO / ACADÊMICO
@@ -55,13 +55,6 @@ st.markdown("""
         border-radius: 4px !important;
         font-weight: 500 !important;
     }
-    .barra-projeto {
-        border: 1px solid rgba(128, 128, 128, 0.28);
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 1rem;
-        background-color: rgba(128, 128, 128, 0.04);
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,8 +64,9 @@ ARQUIVO_PROJETOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pro
 # ---------------------------------------------------------------------------
 # DADOS PRÉ-DEFINIDOS (PADRÃO DO PROJETO)
 # ---------------------------------------------------------------------------
-PRESETS = {
+PRESETS_LINHAS = {
     "Dia 14 de Agosto": {
+        "tipo_grafico": "linhas",
         "titulo_dia": "Dia 14 de agosto",
         "titulo_grafico": "DIA 14 DE AGOSTO - BOSQUE",
         "min_y": 24.0,
@@ -85,6 +79,7 @@ PRESETS = {
         })
     },
     "Dia 16 de Agosto": {
+        "tipo_grafico": "linhas",
         "titulo_dia": "Dia 16 de agosto",
         "titulo_grafico": "DIA 16 DE AGOSTO - BOSQUE",
         "min_y": 24.0,
@@ -97,6 +92,7 @@ PRESETS = {
         })
     },
     "Dia 19 de Agosto": {
+        "tipo_grafico": "linhas",
         "titulo_dia": "Dia 19 de agosto",
         "titulo_grafico": "DIA 19 DE AGOSTO - BOSQUE",
         "min_y": 22.0,
@@ -110,7 +106,26 @@ PRESETS = {
     }
 }
 
-# Paletas de cores disponíveis
+PRESETS_BARRAS = {
+    "TA — Média e Desvio Padrão (Agosto e Dezembro)": {
+        "tipo_grafico": "barras",
+        "titulo_dia": "TA",
+        "titulo_grafico": "",
+        "rotulo_x": "TA",
+        "rotulo_y": "Média (%)",
+        "min_y": 0.0,
+        "max_y": 35.0,
+        "df": pd.DataFrame({
+            'Mes': ['Agosto', 'Dezembro'],
+            'Bosque': [27.32, 28.60],
+            'Desvio_Bosque': [2.30, 1.42],
+            'Estacionamento': [28.50, 29.40],
+            'Desvio_Estacionamento': [4.87, 2.19]
+        })
+    }
+}
+
+# Paletas de cores para Gráfico de Linhas
 PALETAS = {
     "OriginLab Pro (Preto, Vermelho, Azul)": {
         "Manha": "#222222",
@@ -134,9 +149,37 @@ PALETAS = {
     }
 }
 
+# Paletas de cores para Gráfico de Barras (Média e Desvio Padrão)
+PALETAS_BARRAS = {
+    "OriginLab Pastel (Padrão do Modelo)": {
+        "Bosque": "#fdc086",
+        "Desvio_Bosque": "#8fd194",
+        "Estacionamento": "#c2b2d6",
+        "Desvio_Estacionamento": "#ffff99"
+    },
+    "OriginLab Clássico (Cores Vibrantes)": {
+        "Bosque": "#f39c12",
+        "Desvio_Bosque": "#27ae60",
+        "Estacionamento": "#8e44ad",
+        "Desvio_Estacionamento": "#f1c40f"
+    },
+    "Acadêmico Monocromático (Escala de Cinza)": {
+        "Bosque": "#333333",
+        "Desvio_Bosque": "#777777",
+        "Estacionamento": "#aaaaaa",
+        "Desvio_Estacionamento": "#dddddd"
+    },
+    "Nature / Científico (Azul & Verde)": {
+        "Bosque": "#2b5c8f",
+        "Desvio_Bosque": "#6baed6",
+        "Estacionamento": "#31a354",
+        "Desvio_Estacionamento": "#a1d99b"
+    }
+}
+
 FONTES_DISPONIVEIS = [
-    "Times New Roman (Recomendado ABNT)",
     "Arial (Científico Internacional)",
+    "Times New Roman (Recomendado ABNT)",
     "Cambria (Serifada Elegante)",
     "Garamond (Clássico Acadêmico)",
     "Calibri (Sans-serif Moderna)"
@@ -161,6 +204,19 @@ DEFAULT_CONFIG = {
     "cor_manha": "#222222",
     "cor_tarde": "#e74c3c",
     "cor_noite": "#2980b9",
+    "opcao_paleta_barras": "OriginLab Pastel (Padrão do Modelo)",
+    "cor_bosque": "#fdc086",
+    "cor_desvio_bosque": "#8fd194",
+    "cor_estacionamento": "#c2b2d6",
+    "cor_desvio_estacionamento": "#ffff99",
+    "rotulo_s1": "Bosque",
+    "rotulo_s2": "Desvio/p",
+    "rotulo_s3": "Estacionamento",
+    "rotulo_s4": "Desvio/p",
+    "exibir_valores_barras": True,
+    "formato_decimais_barras": "Automático (ex: 27,32 | 2,3)",
+    "negrito_valores_barras": True,
+    "largura_grupo_barras": 0.68,
     "espessura_linha": 1.2,
     "com_marcadores": False,
     "exibir_grade": False,
@@ -168,6 +224,10 @@ DEFAULT_CONFIG = {
     "show_manha": True,
     "show_tarde": True,
     "show_noite": True,
+    "show_bosque": True,
+    "show_desvio_bosque": True,
+    "show_estacionamento": True,
+    "show_desvio_estacionamento": True,
     "exibir_legenda": True,
     "moldura_legenda": True,
     "orientacao_leg": "Vertical (Empilhados)",
@@ -212,20 +272,31 @@ def gravar_banco_projetos(banco):
         json.dump(banco, f, ensure_ascii=False, indent=2)
 
 
-def construir_payload_projeto(nome_projeto, df, titulo_dia, titulo_grafico, min_y, max_y, cfg):
+def construir_payload_projeto(nome_projeto, tipo_grafico, df, titulo_dia, titulo_grafico, min_y, max_y, cfg):
     """Empacota todos os dados e configurações atuais do projeto para serialização JSON."""
     df_clean = df.copy()
     registros = []
-    for _, row in df_clean.iterrows():
-        registros.append({
-            "Pontos": str(row.get("Pontos", "")),
-            "Manha": None if pd.isna(row.get("Manha")) else float(row.get("Manha")),
-            "Tarde": None if pd.isna(row.get("Tarde")) else float(row.get("Tarde")),
-            "Noite": None if pd.isna(row.get("Noite")) else float(row.get("Noite")),
-        })
+    if tipo_grafico == "barras":
+        for _, row in df_clean.iterrows():
+            registros.append({
+                "Mes": str(row.get("Mes", "")),
+                "Bosque": None if pd.isna(row.get("Bosque")) else float(row.get("Bosque")),
+                "Desvio_Bosque": None if pd.isna(row.get("Desvio_Bosque")) else float(row.get("Desvio_Bosque")),
+                "Estacionamento": None if pd.isna(row.get("Estacionamento")) else float(row.get("Estacionamento")),
+                "Desvio_Estacionamento": None if pd.isna(row.get("Desvio_Estacionamento")) else float(row.get("Desvio_Estacionamento")),
+            })
+    else:
+        for _, row in df_clean.iterrows():
+            registros.append({
+                "Pontos": str(row.get("Pontos", "")),
+                "Manha": None if pd.isna(row.get("Manha")) else float(row.get("Manha")),
+                "Tarde": None if pd.isna(row.get("Tarde")) else float(row.get("Tarde")),
+                "Noite": None if pd.isna(row.get("Noite")) else float(row.get("Noite")),
+            })
 
     return {
         "nome_projeto": nome_projeto.strip(),
+        "tipo_grafico": tipo_grafico,
         "atualizado_em": datetime.now().strftime("%d/%m/%Y às %H:%M:%S"),
         "titulo_dia": titulo_dia,
         "titulo_grafico": titulo_grafico,
@@ -238,22 +309,35 @@ def construir_payload_projeto(nome_projeto, df, titulo_dia, titulo_grafico, min_
 
 def aplicar_projeto_na_sessao(proj_dict):
     """Restaura um projeto salvo para dentro do st.session_state."""
+    tipo = proj_dict.get("tipo_grafico", "linhas")
+    st.session_state.tipo_grafico = tipo
     st.session_state.nome_projeto_atual = proj_dict.get("nome_projeto", proj_dict.get("titulo_dia", "Meu Projeto"))
-    st.session_state.titulo_dia = proj_dict.get("titulo_dia", "Dia 14 de agosto")
-    st.session_state.titulo_grafico = proj_dict.get("titulo_grafico", "DIA 14 DE AGOSTO - BOSQUE")
-    st.session_state.min_y = float(proj_dict.get("min_y", 24.0))
-    st.session_state.max_y = float(proj_dict.get("max_y", 33.0))
+    st.session_state.titulo_dia = proj_dict.get("titulo_dia", "TA" if tipo == "barras" else "Dia 14 de agosto")
+    st.session_state.titulo_grafico = proj_dict.get("titulo_grafico", "" if tipo == "barras" else "DIA 14 DE AGOSTO - BOSQUE")
+    st.session_state.min_y = float(proj_dict.get("min_y", 0.0 if tipo == "barras" else 24.0))
+    st.session_state.max_y = float(proj_dict.get("max_y", 35.0 if tipo == "barras" else 33.0))
     st.session_state.ultimo_salvamento = proj_dict.get("atualizado_em")
 
     registros = proj_dict.get("dados", [])
-    if registros:
-        df_loaded = pd.DataFrame(registros)
-        for col in ["Pontos", "Manha", "Tarde", "Noite"]:
-            if col not in df_loaded.columns:
-                df_loaded[col] = np.nan if col != "Pontos" else ""
-        st.session_state.df_atual = df_loaded[["Pontos", "Manha", "Tarde", "Noite"]].copy()
+    if tipo == "barras":
+        if registros:
+            df_loaded = pd.DataFrame(registros)
+            cols_barras = ["Mes", "Bosque", "Desvio_Bosque", "Estacionamento", "Desvio_Estacionamento"]
+            for col in cols_barras:
+                if col not in df_loaded.columns:
+                    df_loaded[col] = np.nan if col != "Mes" else ""
+            st.session_state.df_barras = df_loaded[cols_barras].copy()
+        else:
+            st.session_state.df_barras = PRESETS_BARRAS["TA — Média e Desvio Padrão (Agosto e Dezembro)"]["df"].copy()
     else:
-        st.session_state.df_atual = PRESETS["Dia 14 de Agosto"]["df"].copy()
+        if registros:
+            df_loaded = pd.DataFrame(registros)
+            for col in ["Pontos", "Manha", "Tarde", "Noite"]:
+                if col not in df_loaded.columns:
+                    df_loaded[col] = np.nan if col != "Pontos" else ""
+            st.session_state.df_atual = df_loaded[["Pontos", "Manha", "Tarde", "Noite"]].copy()
+        else:
+            st.session_state.df_atual = PRESETS_LINHAS["Dia 14 de Agosto"]["df"].copy()
 
     cfg_salva = proj_dict.get("config", {})
     nova_cfg = DEFAULT_CONFIG.copy()
@@ -296,15 +380,49 @@ def sanitizar_dados_tabela(df):
     return df_novo, modificado
 
 
-def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
-                            min_y, max_y, series_ativas, cores_periodos, estilos_linhas,
-                            fonte_nome, tamanho_fonte, espessura_linha, com_marcadores,
-                            bordas_config, ticks_config, legenda_config, exibir_grade):
-    """
-    Renderiza a figura do Matplotlib com controle milimétrico de tipografia,
-    cores, linhas visíveis, bordas do quadro e posicionamento livre da legenda.
-    """
-    # 1. Configuração de Tipografia
+def sanitizar_dados_barras(df):
+    """Sanitiza a tabela de Média e Desvio Padrão."""
+    modificado = False
+    df_novo = df.copy()
+
+    for idx in range(len(df_novo)):
+        val_mes = df_novo.iloc[idx]['Mes']
+        if pd.isna(val_mes) or str(val_mes).strip().lower() in ['none', 'nan', '']:
+            df_novo.iloc[idx, df_novo.columns.get_loc('Mes')] = f"Mês {idx + 1}"
+            modificado = True
+
+    cols_num = ['Bosque', 'Desvio_Bosque', 'Estacionamento', 'Desvio_Estacionamento']
+    for col in cols_num:
+        if col in df_novo.columns:
+            for idx in range(len(df_novo)):
+                val = df_novo.iloc[idx][col]
+                if pd.notnull(val):
+                    try:
+                        v_float = float(val)
+                        if 100.0 < v_float <= 1000.0:
+                            df_novo.iloc[idx, df_novo.columns.get_loc(col)] = round(v_float / 10.0, 2)
+                            modificado = True
+                        elif 1000.0 < v_float <= 10000.0:
+                            df_novo.iloc[idx, df_novo.columns.get_loc(col)] = round(v_float / 100.0, 2)
+                            modificado = True
+                    except (ValueError, TypeError):
+                        pass
+
+    return df_novo, modificado
+
+
+def formatar_numero_ptbr(valor, modo_formato="Automático (ex: 27,32 | 2,3)"):
+    """Formata um número float com vírgula decimal no padrão brasileiro (ex: 27,32 ou 2,3)."""
+    if pd.isna(valor):
+        return ""
+    if "Fixas" in modo_formato:
+        return f"{float(valor):.2f}".replace(".", ",")
+    texto = f"{float(valor):.2f}".rstrip("0").rstrip(".")
+    return texto.replace(".", ",")
+
+
+def configurar_fonte_matplotlib(fonte_nome):
+    """Configura a família tipográfica do Matplotlib."""
     if "Times" in fonte_nome:
         plt.rcParams['font.serif'] = ['Times New Roman', 'Times', 'DejaVu Serif', 'serif']
         plt.rcParams['font.family'] = 'serif'
@@ -318,6 +436,17 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
         plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans', 'sans-serif']
         plt.rcParams['font.family'] = 'sans-serif'
 
+
+def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
+                            min_y, max_y, series_ativas, cores_periodos, estilos_linhas,
+                            fonte_nome, tamanho_fonte, espessura_linha, com_marcadores,
+                            bordas_config, ticks_config, legenda_config, exibir_grade):
+    """
+    Renderiza a figura de linhas do Matplotlib com controle milimétrico de tipografia,
+    cores, linhas visíveis, bordas do quadro e posicionamento livre da legenda.
+    """
+    configurar_fonte_matplotlib(fonte_nome)
+
     fig, ax = plt.subplots(figsize=(7.2, 4.4), dpi=200)
     fig.patch.set_facecolor('white')
     ax.set_facecolor('white')
@@ -327,7 +456,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
 
     marcadores_map = {'Manha': 'o', 'Tarde': 's', 'Noite': '^'}
 
-    # 2. Plotagem das linhas (apenas as séries ativas marcadas pela usuária)
+    # Plotagem das linhas (apenas as séries ativas marcadas pela usuária)
     for periodo in ['Manha', 'Tarde', 'Noite']:
         if periodo in df.columns and periodo in series_ativas:
             m = marcadores_map[periodo] if com_marcadores else None
@@ -346,7 +475,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
                 markerfacecolor='white' if com_marcadores and "Monocromático" in str(cores_periodos) else cor
             )
 
-    # 3. Escalas e Limites dos Eixos
+    # Escalas e Limites dos Eixos
     ax.set_xticks(x_indices)
     ax.set_xticklabels(pontos, fontsize=tamanho_fonte - 0.5)
 
@@ -367,7 +496,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
     if len(x_indices) > 0:
         ax.set_xlim(-0.55, len(x_indices) - 0.45)
 
-    # 4. Controle das Bordas (Spines)
+    # Controle das Bordas (Spines)
     cor_borda = bordas_config.get('cor', 'black')
     esp_borda = bordas_config.get('espessura', 1.15)
 
@@ -380,7 +509,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
         ax.spines[s_name].set_color(cor_borda)
         ax.spines[s_name].set_linewidth(esp_borda)
 
-    # 5. Controle dos Ticks (Traços de Escala)
+    # Controle dos Ticks (Traços de Escala)
     direcao_t = ticks_config.get('direcao', 'in')
     ticks_topo = ticks_config.get('topo', True) and bordas_config.get('topo', True)
     ticks_dir = ticks_config.get('direita', True) and bordas_config.get('direita', True)
@@ -407,7 +536,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
 
     ax.grid(exibir_grade, color='#e0e0e0', linestyle='--', linewidth=0.6)
 
-    # 6. Rótulos e Título
+    # Rótulos e Título
     ax.set_xlabel(rotulo_x, fontsize=tamanho_fonte, color='black', labelpad=8)
     ax.set_ylabel(rotulo_y, fontsize=tamanho_fonte, color='black', labelpad=8)
 
@@ -415,7 +544,7 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
         pad_val = 12 if bordas_config.get('topo', True) else 22
         ax.set_title(titulo_grafico, fontsize=tamanho_fonte + 1.5, color='black', pad=pad_val, fontweight='normal')
 
-    # 7. Posicionamento e Customização Livre da Legenda (Arrastável / Coordenadas)
+    # Posicionamento e Customização Livre da Legenda
     if legenda_config.get('exibir', True) and len(series_ativas) > 0:
         pos_x = legenda_config.get('pos_x', 0.98)
         pos_y = legenda_config.get('pos_y', 0.98)
@@ -444,8 +573,176 @@ def gerar_figura_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
     return fig
 
 
+def gerar_figura_barras_matplotlib(df, titulo_grafico, rotulo_x, rotulo_y,
+                                   min_y, max_y, series_barras_ativas, cores_barras, rotulos_legenda,
+                                   fonte_nome, tamanho_fonte, exibir_valores, formato_decimais,
+                                   negrito_valores, largura_grupo, bordas_config, ticks_config,
+                                   legenda_config, exibir_grade):
+    """
+    Renderiza o Gráfico de Barras Agrupadas (Média e Desvio Padrão: Bosque vs Estacionamento)
+    no padrão OriginLab idêntico ao modelo enviado pela usuária.
+    """
+    configurar_fonte_matplotlib(fonte_nome)
+
+    fig, ax = plt.subplots(figsize=(7.4, 4.6), dpi=200)
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
+
+    meses = df['Mes'].astype(str).tolist()
+    x_indices = np.arange(len(meses))
+
+    todas_series = [
+        ("Bosque", rotulos_legenda.get("Bosque", "Bosque")),
+        ("Desvio_Bosque", rotulos_legenda.get("Desvio_Bosque", "Desvio/p")),
+        ("Estacionamento", rotulos_legenda.get("Estacionamento", "Estacionamento")),
+        ("Desvio_Estacionamento", rotulos_legenda.get("Desvio_Estacionamento", "Desvio/p")),
+    ]
+    series_plot = [(col, lab) for col, lab in todas_series if col in series_barras_ativas and col in df.columns]
+
+    n_series = len(series_plot)
+    if n_series > 0 and len(x_indices) > 0:
+        largura_barra = largura_grupo / n_series
+        offsets = np.linspace(
+            -largura_grupo / 2.0 + largura_barra / 2.0,
+            largura_grupo / 2.0 - largura_barra / 2.0,
+            n_series
+        )
+
+        for idx_s, (col_name, label_leg) in enumerate(series_plot):
+            valores = pd.to_numeric(df[col_name], errors='coerce').fillna(0.0).tolist()
+            posicoes_x = x_indices + offsets[idx_s]
+            cor_b = cores_barras.get(col_name, "#cccccc")
+
+            barras = ax.bar(
+                posicoes_x,
+                valores,
+                width=largura_barra,
+                label=label_leg,
+                color=cor_b,
+                edgecolor="#707070",
+                linewidth=0.75,
+                zorder=3
+            )
+
+            if exibir_valores:
+                for rect, val_orig in zip(barras, df[col_name]):
+                    if pd.notnull(val_orig):
+                        altura = rect.get_height()
+                        txt_val = formatar_numero_ptbr(val_orig, formato_decimais)
+                        ax.annotate(
+                            txt_val,
+                            xy=(rect.get_x() + rect.get_width() / 2.0, altura),
+                            xytext=(0, 2.5),
+                            textcoords="offset points",
+                            ha='center',
+                            va='bottom',
+                            fontsize=tamanho_fonte - 1.2,
+                            fontweight='bold' if negrito_valores else 'normal',
+                            color='black',
+                            zorder=4
+                        )
+
+    # Eixos e limites
+    ax.set_xticks(x_indices)
+    ax.set_xticklabels(meses, fontsize=tamanho_fonte - 0.5)
+
+    pad_min = 0.0 if min_y is None else float(min_y)
+    pad_max = 35.0 if max_y is None else float(max_y)
+    if pad_max <= pad_min:
+        pad_max = pad_min + 10.0
+    ax.set_ylim(pad_min, pad_max)
+
+    if len(x_indices) > 0:
+        ax.set_xlim(-0.5, len(x_indices) - 0.5)
+
+    # Controle das Bordas (Spines)
+    cor_borda = bordas_config.get('cor', 'black')
+    esp_borda = bordas_config.get('espessura', 1.0)
+
+    ax.spines['top'].set_visible(bordas_config.get('topo', True))
+    ax.spines['right'].set_visible(bordas_config.get('direita', True))
+    ax.spines['bottom'].set_visible(bordas_config.get('baixo', True))
+    ax.spines['left'].set_visible(bordas_config.get('esquerda', True))
+
+    for s_name in ['top', 'right', 'bottom', 'left']:
+        ax.spines[s_name].set_color(cor_borda)
+        ax.spines[s_name].set_linewidth(esp_borda)
+
+    # Controle dos Ticks
+    direcao_t = ticks_config.get('direcao', 'out')
+    ticks_topo = ticks_config.get('topo', False) and bordas_config.get('topo', True)
+    ticks_dir = ticks_config.get('direita', False) and bordas_config.get('direita', True)
+    ticks_baixo = ticks_config.get('baixo', True) and bordas_config.get('baixo', True)
+    ticks_esq = ticks_config.get('esquerda', True) and bordas_config.get('esquerda', True)
+
+    ax.tick_params(
+        which='major', direction=direcao_t,
+        top=ticks_topo, right=ticks_dir, bottom=ticks_baixo, left=ticks_esq,
+        length=5.0, width=1.0, color=cor_borda, labelsize=tamanho_fonte - 0.5
+    )
+
+    # Passo principal de 5 em 5 no eixo Y (0, 5, 10, 15, 20, 25, 30, 35) como no modelo
+    intervalo_y = pad_max - pad_min
+    passo_maior_y = 5.0 if intervalo_y >= 15.0 else 2.0
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(passo_maior_y))
+
+    if ticks_config.get('minor_ticks', True):
+        if len(x_indices) > 0:
+            ax.xaxis.set_minor_locator(ticker.FixedLocator(np.arange(-0.5, len(x_indices) + 0.5, 1.0)))
+        ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+        ax.tick_params(
+            which='minor', direction=direcao_t,
+            top=ticks_topo, right=ticks_dir, bottom=ticks_baixo, left=ticks_esq,
+            length=2.8, width=0.8, color=cor_borda
+        )
+
+    if exibir_grade:
+        ax.grid(True, axis='y', color='#e0e0e0', linestyle='--', linewidth=0.6, zorder=0)
+    else:
+        ax.grid(False)
+
+    # Rótulos e Título
+    ax.set_xlabel(rotulo_x, fontsize=tamanho_fonte + 0.5, color='black', labelpad=8)
+    ax.set_ylabel(rotulo_y, fontsize=tamanho_fonte, color='black', labelpad=8)
+
+    if titulo_grafico and titulo_grafico.strip():
+        pad_val = 12 if bordas_config.get('topo', True) else 22
+        ax.set_title(titulo_grafico, fontsize=tamanho_fonte + 1.5, color='black', pad=pad_val, fontweight='normal')
+
+    # Legenda estilo OriginLab
+    if legenda_config.get('exibir', True) and n_series > 0:
+        pos_x = legenda_config.get('pos_x', 0.98)
+        pos_y = legenda_config.get('pos_y', 0.98)
+        loc_ancora = legenda_config.get('loc', 'upper right')
+        ncol_leg = n_series if legenda_config.get('orientacao') == 'Horizontal' else 1
+        moldura_leg = legenda_config.get('moldura', True)
+
+        leg = ax.legend(
+            loc=loc_ancora,
+            bbox_to_anchor=(pos_x, pos_y),
+            ncol=ncol_leg,
+            frameon=moldura_leg,
+            edgecolor='black' if moldura_leg else 'none',
+            facecolor='white',
+            framealpha=1.0,
+            fontsize=tamanho_fonte - 2.0,
+            handlelength=1.8,
+            handleheight=1.1,
+            handletextpad=0.5,
+            borderpad=0.45,
+            labelspacing=0.35,
+            columnspacing=1.2
+        )
+        if moldura_leg:
+            leg.get_frame().set_linewidth(0.9)
+            leg.set_zorder(10)
+
+    plt.tight_layout()
+    return fig
+
+
 def gerar_excel_bytes(df, titulo_dia, titulo_grafico, min_y, max_y):
-    """Gera a planilha Excel (.xlsx) com a tabela formatada e o gráfico nativo ao lado."""
+    """Gera a planilha Excel (.xlsx) para o gráfico de linhas (Pontos P1..Pn)."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Dados e Grafico"
@@ -517,6 +814,97 @@ def gerar_excel_bytes(df, titulo_dia, titulo_grafico, min_y, max_y):
     return buf.getvalue()
 
 
+def gerar_excel_barras_bytes(df, titulo_tabela, titulo_grafico, rotulo_x, rotulo_y, min_y, max_y, rotulos_legenda):
+    """
+    Gera a planilha Excel (.xlsx) com a tabela de Média e Desvio Padrão (TA) idêntica
+    ao modelo enviado e o gráfico de colunas agrupadas ao lado.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Media e Desvio Padrao"
+
+    borda_preta = Border(
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000')
+    )
+
+    ws.merge_cells("B2:F2")
+    header = ws.cell(row=2, column=2, value=titulo_tabela or "TA")
+    header.font = Font(name="Calibri", size=11, bold=False)
+    header.alignment = Alignment(horizontal="center", vertical="center")
+    for c in range(2, 7):
+        ws.cell(row=2, column=c).border = borda_preta
+
+    cabecalhos_cols = [
+        "Mês",
+        rotulos_legenda.get("Bosque", "Bosque"),
+        rotulos_legenda.get("Desvio_Bosque", "Desvio/p"),
+        rotulos_legenda.get("Estacionamento", "Estacionamento"),
+        rotulos_legenda.get("Desvio_Estacionamento", "Desvio/p")
+    ]
+    for idx, texto_col in enumerate(cabecalhos_cols, start=2):
+        c = ws.cell(row=3, column=idx, value=texto_col)
+        c.font = Font(name="Times New Roman", size=11, bold=False)
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = borda_preta
+    ws.row_dimensions[3].height = 28
+
+    cols_internas = ["Bosque", "Desvio_Bosque", "Estacionamento", "Desvio_Estacionamento"]
+    for r_idx, row in df.iterrows():
+        r = 4 + r_idx
+        c_mes = ws.cell(row=r, column=2, value=str(row['Mes']))
+        c_mes.font = Font(name="Times New Roman", size=11)
+        c_mes.alignment = Alignment(horizontal="left", vertical="center")
+        c_mes.border = borda_preta
+
+        for col_offset, col_name in enumerate(cols_internas, start=3):
+            val = row.get(col_name, np.nan)
+            cell = ws.cell(row=r, column=col_offset, value=float(val) if pd.notnull(val) else None)
+            cell.font = Font(name="Times New Roman", size=11)
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.border = borda_preta
+            if cell.value is not None:
+                cell.number_format = '0.##'
+
+    fim_dados = 3 + len(df)
+
+    chart = BarChart()
+    chart.type = "col"
+    chart.style = 10
+    chart.grouping = "clustered"
+    chart.overlap = 0
+    chart.title = titulo_grafico if titulo_grafico else None
+    chart.y_axis.title = rotulo_y
+    chart.x_axis.title = rotulo_x
+    if min_y is not None:
+        chart.y_axis.scaling.min = min_y
+    if max_y is not None:
+        chart.y_axis.scaling.max = max_y
+    chart.width = 16
+    chart.height = 10
+
+    dados_ref = Reference(ws, min_col=3, min_row=3, max_col=6, max_row=fim_dados)
+    cats_ref = Reference(ws, min_col=2, min_row=4, max_row=fim_dados)
+    chart.add_data(dados_ref, titles_from_data=True)
+    chart.set_categories(cats_ref)
+    ws.add_chart(chart, "H2")
+
+    ws.column_dimensions['A'].width = 3
+    ws.column_dimensions['B'].width = 14
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 14
+    ws.column_dimensions['E'].width = 16
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 4
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # INICIALIZAÇÃO DO ESTADO DA SESSÃO (CARREGA ÚLTIMO PROJETO SALVO SE EXISTIR)
 # ---------------------------------------------------------------------------
@@ -525,6 +913,12 @@ banco_projetos = ler_banco_projetos()
 if "editor_version" not in st.session_state:
     st.session_state.editor_version = 0
 
+if "df_barras" not in st.session_state:
+    st.session_state.df_barras = PRESETS_BARRAS["TA — Média e Desvio Padrão (Agosto e Dezembro)"]["df"].copy()
+
+if "df_atual" not in st.session_state:
+    st.session_state.df_atual = PRESETS_LINHAS["Dia 14 de Agosto"]["df"].copy()
+
 if "inicializado" not in st.session_state:
     st.session_state.inicializado = True
     ultimo_ativo = banco_projetos.get("ultimo_projeto_ativo")
@@ -532,18 +926,20 @@ if "inicializado" not in st.session_state:
         aplicar_projeto_na_sessao(banco_projetos["projetos"][ultimo_ativo])
         st.session_state.ultimo_preset = "Selecione..."
     else:
+        st.session_state.tipo_grafico = "linhas"
         st.session_state.ultimo_preset = "Dia 14 de Agosto"
         st.session_state.nome_projeto_atual = "Dia 14 de agosto"
-        st.session_state.titulo_dia = PRESETS["Dia 14 de Agosto"]["titulo_dia"]
-        st.session_state.titulo_grafico = PRESETS["Dia 14 de Agosto"]["titulo_grafico"]
-        st.session_state.min_y = PRESETS["Dia 14 de Agosto"]["min_y"]
-        st.session_state.max_y = PRESETS["Dia 14 de Agosto"]["max_y"]
-        st.session_state.df_atual = PRESETS["Dia 14 de Agosto"]["df"].copy()
+        st.session_state.titulo_dia = PRESETS_LINHAS["Dia 14 de Agosto"]["titulo_dia"]
+        st.session_state.titulo_grafico = PRESETS_LINHAS["Dia 14 de Agosto"]["titulo_grafico"]
+        st.session_state.min_y = PRESETS_LINHAS["Dia 14 de Agosto"]["min_y"]
+        st.session_state.max_y = PRESETS_LINHAS["Dia 14 de Agosto"]["max_y"]
+        st.session_state.df_atual = PRESETS_LINHAS["Dia 14 de Agosto"]["df"].copy()
         st.session_state.cfg = DEFAULT_CONFIG.copy()
         st.session_state.ultimo_salvamento = None
 
 v = st.session_state.editor_version
 cfg = st.session_state.cfg
+tipo_grafico_atual = st.session_state.get("tipo_grafico", "linhas")
 
 # ---------------------------------------------------------------------------
 # BARRA LATERAL: CONFIGURAÇÕES E ESTILO
@@ -553,6 +949,51 @@ with st.sidebar:
     st.caption("Sistema de Análise Microclimática")
     st.markdown("---")
 
+    st.markdown("#### **Modo de Gráfico**")
+    opcoes_modo = [
+        "📈 Temperaturas por Ponto (Linhas P1–P10)",
+        "📊 Média e Desvio Padrão (Barras Agrupadas)"
+    ]
+    idx_modo = 1 if tipo_grafico_atual == "barras" else 0
+    modo_selecionado = st.radio(
+        "Selecione o tipo de análise:",
+        opcoes_modo,
+        index=idx_modo,
+        key=f"modo_radio_{v}"
+    )
+    novo_tipo = "barras" if "Barras" in modo_selecionado else "linhas"
+    if novo_tipo != tipo_grafico_atual:
+        st.session_state.tipo_grafico = novo_tipo
+        if novo_tipo == "barras":
+            p_b = PRESETS_BARRAS["TA — Média e Desvio Padrão (Agosto e Dezembro)"]
+            st.session_state.nome_projeto_atual = "TA - Média e Desvio Padrão"
+            st.session_state.titulo_dia = p_b["titulo_dia"]
+            st.session_state.titulo_grafico = p_b["titulo_grafico"]
+            st.session_state.min_y = p_b["min_y"]
+            st.session_state.max_y = p_b["max_y"]
+            st.session_state.cfg["rotulo_x"] = p_b["rotulo_x"]
+            st.session_state.cfg["rotulo_y"] = p_b["rotulo_y"]
+            st.session_state.cfg["opcao_fonte"] = "Arial (Científico Internacional)"
+            st.session_state.cfg["direcao_ticks"] = "Para fora (out)"
+            st.session_state.cfg["ticks_topo"] = False
+            st.session_state.cfg["ticks_dir"] = False
+        else:
+            p_l = PRESETS_LINHAS["Dia 14 de Agosto"]
+            st.session_state.nome_projeto_atual = p_l["titulo_dia"]
+            st.session_state.titulo_dia = p_l["titulo_dia"]
+            st.session_state.titulo_grafico = p_l["titulo_grafico"]
+            st.session_state.min_y = p_l["min_y"]
+            st.session_state.max_y = p_l["max_y"]
+            st.session_state.cfg["rotulo_x"] = "Pontos"
+            st.session_state.cfg["rotulo_y"] = "Temperatura do ar (°C)"
+            st.session_state.cfg["direcao_ticks"] = "Para dentro (in)"
+            st.session_state.cfg["ticks_topo"] = True
+            st.session_state.cfg["ticks_dir"] = True
+        st.session_state.ultimo_salvamento = None
+        st.session_state.editor_version += 1
+        st.rerun()
+
+    st.markdown("---")
     st.markdown("#### **Tipografia Acadêmica**")
     idx_fonte = FONTES_DISPONIVEIS.index(cfg["opcao_fonte"]) if cfg["opcao_fonte"] in FONTES_DISPONIVEIS else 0
     opcao_fonte = st.selectbox(
@@ -571,52 +1012,139 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### **Cores das Séries**")
-    opcoes_paleta_lista = list(PALETAS.keys()) + ["Personalizada (Definir manualmente)"]
-    idx_paleta = opcoes_paleta_lista.index(cfg["opcao_paleta"]) if cfg["opcao_paleta"] in opcoes_paleta_lista else 0
-    opcao_paleta = st.selectbox(
-        "Paleta de Cores:",
-        opcoes_paleta_lista,
-        index=idx_paleta,
-        key=f"paleta_{v}"
-    )
+    if tipo_grafico_atual == "linhas":
+        opcoes_paleta_lista = list(PALETAS.keys()) + ["Personalizada (Definir manualmente)"]
+        idx_paleta = opcoes_paleta_lista.index(cfg["opcao_paleta"]) if cfg["opcao_paleta"] in opcoes_paleta_lista else 0
+        opcao_paleta = st.selectbox(
+            "Paleta de Cores:",
+            opcoes_paleta_lista,
+            index=idx_paleta,
+            key=f"paleta_{v}"
+        )
 
-    if opcao_paleta == "Personalizada (Definir manualmente)":
-        c_p1, c_p2, c_p3 = st.columns(3)
-        with c_p1:
-            cor_manha = st.color_picker("Manhã", value=cfg["cor_manha"], key=f"cor_m_{v}")
-        with c_p2:
-            cor_tarde = st.color_picker("Tarde", value=cfg["cor_tarde"], key=f"cor_t_{v}")
-        with c_p3:
-            cor_noite = st.color_picker("Noite", value=cfg["cor_noite"], key=f"cor_n_{v}")
-        cores_selecionadas = {"Manha": cor_manha, "Tarde": cor_tarde, "Noite": cor_noite}
+        if opcao_paleta == "Personalizada (Definir manualmente)":
+            c_p1, c_p2, c_p3 = st.columns(3)
+            with c_p1:
+                cor_manha = st.color_picker("Manhã", value=cfg["cor_manha"], key=f"cor_m_{v}")
+            with c_p2:
+                cor_tarde = st.color_picker("Tarde", value=cfg["cor_tarde"], key=f"cor_t_{v}")
+            with c_p3:
+                cor_noite = st.color_picker("Noite", value=cfg["cor_noite"], key=f"cor_n_{v}")
+            cores_selecionadas = {"Manha": cor_manha, "Tarde": cor_tarde, "Noite": cor_noite}
+        else:
+            cor_manha = cfg["cor_manha"]
+            cor_tarde = cfg["cor_tarde"]
+            cor_noite = cfg["cor_noite"]
+            cores_selecionadas = PALETAS[opcao_paleta]
+
+        # Mantém configurações das barras inalteradas
+        opcao_paleta_barras = cfg["opcao_paleta_barras"]
+        cor_bosque = cfg["cor_bosque"]
+        cor_desvio_bosque = cfg["cor_desvio_bosque"]
+        cor_estacionamento = cfg["cor_estacionamento"]
+        cor_desvio_estacionamento = cfg["cor_desvio_estacionamento"]
+        cores_barras_selecionadas = PALETAS_BARRAS["OriginLab Pastel (Padrão do Modelo)"]
     else:
+        opcoes_paleta_b_lista = list(PALETAS_BARRAS.keys()) + ["Personalizada (Definir manualmente)"]
+        idx_paleta_b = opcoes_paleta_b_lista.index(cfg["opcao_paleta_barras"]) if cfg["opcao_paleta_barras"] in opcoes_paleta_b_lista else 0
+        opcao_paleta_barras = st.selectbox(
+            "Paleta de Cores (Barras):",
+            opcoes_paleta_b_lista,
+            index=idx_paleta_b,
+            key=f"paleta_b_{v}"
+        )
+
+        if opcao_paleta_barras == "Personalizada (Definir manualmente)":
+            cb1, cb2 = st.columns(2)
+            with cb1:
+                cor_bosque = st.color_picker("Bosque", value=cfg["cor_bosque"], key=f"cor_bos_{v}")
+                cor_estacionamento = st.color_picker("Estacionamento", value=cfg["cor_estacionamento"], key=f"cor_est_{v}")
+            with cb2:
+                cor_desvio_bosque = st.color_picker("Desvio (Bosque)", value=cfg["cor_desvio_bosque"], key=f"cor_db_{v}")
+                cor_desvio_estacionamento = st.color_picker("Desvio (Estac.)", value=cfg["cor_desvio_estacionamento"], key=f"cor_de_{v}")
+            cores_barras_selecionadas = {
+                "Bosque": cor_bosque,
+                "Desvio_Bosque": cor_desvio_bosque,
+                "Estacionamento": cor_estacionamento,
+                "Desvio_Estacionamento": cor_desvio_estacionamento
+            }
+        else:
+            cor_bosque = cfg["cor_bosque"]
+            cor_desvio_bosque = cfg["cor_desvio_bosque"]
+            cor_estacionamento = cfg["cor_estacionamento"]
+            cor_desvio_estacionamento = cfg["cor_desvio_estacionamento"]
+            cores_barras_selecionadas = PALETAS_BARRAS[opcao_paleta_barras]
+
+        # Mantém configurações das linhas inalteradas
+        opcao_paleta = cfg["opcao_paleta"]
         cor_manha = cfg["cor_manha"]
         cor_tarde = cfg["cor_tarde"]
         cor_noite = cfg["cor_noite"]
-        cores_selecionadas = PALETAS[opcao_paleta]
+        cores_selecionadas = PALETAS["OriginLab Pro (Preto, Vermelho, Azul)"]
 
     st.markdown("---")
-    st.markdown("#### **Traços e Marcadores**")
-    espessura_linha = st.slider(
-        "Espessura do Traço (pt):",
-        min_value=0.8, max_value=2.8,
-        value=float(cfg["espessura_linha"]),
-        step=0.1,
-        key=f"esp_linha_{v}"
-    )
+    if tipo_grafico_atual == "linhas":
+        st.markdown("#### **Traços e Marcadores**")
+        espessura_linha = st.slider(
+            "Espessura do Traço (pt):",
+            min_value=0.8, max_value=2.8,
+            value=float(cfg["espessura_linha"]),
+            step=0.1,
+            key=f"esp_linha_{v}"
+        )
 
-    col_opt1, col_opt2 = st.columns(2)
-    with col_opt1:
-        com_marcadores = st.checkbox("Marcadores nos pontos", value=bool(cfg["com_marcadores"]), key=f"marc_{v}")
-    with col_opt2:
-        exibir_grade = st.checkbox("Linhas de grade", value=bool(cfg["exibir_grade"]), key=f"grade_{v}")
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            com_marcadores = st.checkbox("Marcadores nos pontos", value=bool(cfg["com_marcadores"]), key=f"marc_{v}")
+        with col_opt2:
+            exibir_grade = st.checkbox("Linhas de grade", value=bool(cfg["exibir_grade"]), key=f"grade_{v}")
 
-    com_linhas_distintas = st.checkbox(
-        "Linhas distintas (Sólido / Tracejado / Pontilhado)",
-        value=bool(cfg["com_linhas_distintas"]),
-        help="Ideal para impressões acadêmicas em preto e branco.",
-        key=f"linhas_dist_{v}"
-    )
+        com_linhas_distintas = st.checkbox(
+            "Linhas distintas (Sólido / Tracejado / Pontilhado)",
+            value=bool(cfg["com_linhas_distintas"]),
+            help="Ideal para impressões acadêmicas em preto e branco.",
+            key=f"linhas_dist_{v}"
+        )
+        exibir_valores_barras = cfg["exibir_valores_barras"]
+        formato_decimais_barras = cfg["formato_decimais_barras"]
+        negrito_valores_barras = cfg["negrito_valores_barras"]
+        largura_grupo_barras = cfg["largura_grupo_barras"]
+    else:
+        st.markdown("#### **Opções das Barras e Rótulos**")
+        exibir_valores_barras = st.checkbox(
+            "Exibir valores no topo das barras",
+            value=bool(cfg["exibir_valores_barras"]),
+            key=f"ex_val_b_{v}"
+        )
+        negrito_valores_barras = st.checkbox(
+            "Valores em negrito",
+            value=bool(cfg["negrito_valores_barras"]),
+            key=f"neg_val_b_{v}"
+        )
+        opcoes_fmt_dec = [
+            "Automático (ex: 27,32 | 2,3)",
+            "2 Casas Decimais Fixas (ex: 27,32 | 2,30)"
+        ]
+        idx_fmt_dec = opcoes_fmt_dec.index(cfg["formato_decimais_barras"]) if cfg["formato_decimais_barras"] in opcoes_fmt_dec else 0
+        formato_decimais_barras = st.selectbox(
+            "Formato dos números:",
+            opcoes_fmt_dec,
+            index=idx_fmt_dec,
+            key=f"fmt_dec_b_{v}"
+        )
+        largura_grupo_barras = st.slider(
+            "Largura do grupo de barras:",
+            min_value=0.40, max_value=0.88,
+            value=float(cfg["largura_grupo_barras"]),
+            step=0.02,
+            key=f"larg_grp_b_{v}"
+        )
+        exibir_grade = st.checkbox("Linhas de grade horizontais", value=bool(cfg["exibir_grade"]), key=f"grade_b_{v}")
+
+        espessura_linha = cfg["espessura_linha"]
+        com_marcadores = cfg["com_marcadores"]
+        com_linhas_distintas = cfg["com_linhas_distintas"]
+
     if com_linhas_distintas:
         estilos_linhas = {"Manha": "-", "Tarde": "--", "Noite": ":"}
     else:
@@ -624,7 +1152,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### **Origem dos Dados / Modelos**")
-    opcoes_preset = ["Selecione...", "Criar Novo / Em Branco"] + list(PRESETS.keys())
+    opcoes_preset = (
+        ["Selecione..."]
+        + list(PRESETS_BARRAS.keys())
+        + list(PRESETS_LINHAS.keys())
+        + ["Criar Novo — Barras (Média e Desvio)", "Criar Novo — Linhas (Pontos P1–P10)"]
+    )
     preset_escolhido = st.selectbox(
         "Carregar modelo pré-cadastrado:",
         opcoes_preset,
@@ -647,16 +1180,56 @@ with st.sidebar:
 
 # Tratamento de carregamento de modelo pré-cadastrado
 if preset_escolhido != "Selecione...":
-    if preset_escolhido in PRESETS:
-        p = PRESETS[preset_escolhido]
+    if preset_escolhido in PRESETS_BARRAS:
+        p = PRESETS_BARRAS[preset_escolhido]
+        st.session_state.tipo_grafico = "barras"
+        st.session_state.nome_projeto_atual = "TA - Média e Desvio Padrão"
+        st.session_state.titulo_dia = p["titulo_dia"]
+        st.session_state.titulo_grafico = p["titulo_grafico"]
+        st.session_state.min_y = p["min_y"]
+        st.session_state.max_y = p["max_y"]
+        st.session_state.df_barras = p["df"].copy()
+        st.session_state.cfg["rotulo_x"] = p["rotulo_x"]
+        st.session_state.cfg["rotulo_y"] = p["rotulo_y"]
+        st.session_state.cfg["opcao_fonte"] = "Arial (Científico Internacional)"
+        st.session_state.cfg["direcao_ticks"] = "Para fora (out)"
+        st.session_state.cfg["ticks_topo"] = False
+        st.session_state.cfg["ticks_dir"] = False
+        st.session_state.ultimo_salvamento = None
+    elif preset_escolhido in PRESETS_LINHAS:
+        p = PRESETS_LINHAS[preset_escolhido]
+        st.session_state.tipo_grafico = "linhas"
         st.session_state.nome_projeto_atual = p["titulo_dia"]
         st.session_state.titulo_dia = p["titulo_dia"]
         st.session_state.titulo_grafico = p["titulo_grafico"]
         st.session_state.min_y = p["min_y"]
         st.session_state.max_y = p["max_y"]
         st.session_state.df_atual = p["df"].copy()
+        st.session_state.cfg["rotulo_x"] = "Pontos"
+        st.session_state.cfg["rotulo_y"] = "Temperatura do ar (°C)"
+        st.session_state.cfg["direcao_ticks"] = "Para dentro (in)"
+        st.session_state.cfg["ticks_topo"] = True
+        st.session_state.cfg["ticks_dir"] = True
         st.session_state.ultimo_salvamento = None
-    elif preset_escolhido == "Criar Novo / Em Branco":
+    elif preset_escolhido == "Criar Novo — Barras (Média e Desvio)":
+        st.session_state.tipo_grafico = "barras"
+        st.session_state.nome_projeto_atual = "Novo Projeto - Média e Desvio"
+        st.session_state.titulo_dia = "TA"
+        st.session_state.titulo_grafico = ""
+        st.session_state.min_y = 0.0
+        st.session_state.max_y = 35.0
+        st.session_state.df_barras = pd.DataFrame({
+            'Mes': ['Agosto', 'Dezembro'],
+            'Bosque': [25.0, 26.0],
+            'Desvio_Bosque': [2.0, 1.5],
+            'Estacionamento': [28.0, 29.0],
+            'Desvio_Estacionamento': [3.0, 2.0]
+        })
+        st.session_state.cfg["rotulo_x"] = "TA"
+        st.session_state.cfg["rotulo_y"] = "Média (%)"
+        st.session_state.ultimo_salvamento = None
+    elif preset_escolhido == "Criar Novo — Linhas (Pontos P1–P10)":
+        st.session_state.tipo_grafico = "linhas"
         st.session_state.nome_projeto_atual = "Novo Projeto"
         st.session_state.titulo_dia = "Novo Dia"
         st.session_state.titulo_grafico = "NOVO DIA - BOSQUE"
@@ -668,6 +1241,8 @@ if preset_escolhido != "Selecione...":
             'Tarde': [30.0] * 10,
             'Noite': [26.0] * 10
         })
+        st.session_state.cfg["rotulo_x"] = "Pontos"
+        st.session_state.cfg["rotulo_y"] = "Temperatura do ar (°C)"
         st.session_state.ultimo_salvamento = None
     st.session_state.editor_version += 1
     st.rerun()
@@ -678,7 +1253,6 @@ if uploaded_proj_file is not None:
         proj_importado = json.load(uploaded_proj_file)
         if isinstance(proj_importado, dict) and "dados" in proj_importado:
             aplicar_projeto_na_sessao(proj_importado)
-            # Também salva no banco local para ficar disponível na lista de projetos
             nome_imp = st.session_state.nome_projeto_atual
             banco_projetos["projetos"][nome_imp] = proj_importado
             banco_projetos["ultimo_projeto_ativo"] = nome_imp
@@ -710,10 +1284,11 @@ if uploaded_file is not None:
             elif 'noite' in c_clean:
                 col_map[c] = 'Noite'
 
-        df_up = df_up.rename(columns=col_map)
+        df_up_mapped = df_up.rename(columns=col_map)
         colunas_necessarias = ['Pontos', 'Manha', 'Tarde', 'Noite']
-        if all(c in df_up.columns for c in colunas_necessarias):
-            st.session_state.df_atual = df_up[colunas_necessarias].copy()
+        if all(c in df_up_mapped.columns for c in colunas_necessarias):
+            st.session_state.tipo_grafico = "linhas"
+            st.session_state.df_atual = df_up_mapped[colunas_necessarias].copy()
             nome_base = os.path.splitext(uploaded_file.name)[0]
             st.session_state.nome_projeto_atual = nome_base
             st.session_state.titulo_dia = nome_base
@@ -722,7 +1297,7 @@ if uploaded_file is not None:
             st.toast(f"Planilha '{uploaded_file.name}' carregada com sucesso.", icon="✅")
             st.rerun()
         else:
-            st.sidebar.error("A planilha precisa ter as colunas: Pontos, Manha, Tarde e Noite.")
+            st.sidebar.error("Para importar planilha de pontos, inclua as colunas: Pontos, Manha, Tarde e Noite.")
     except Exception as e:
         st.sidebar.error(f"Erro ao ler planilha: {e}")
 
@@ -735,206 +1310,464 @@ st.markdown('<div class="subtitulo-institucional">Laboratório de Monitoramento 
 # Contêiner no topo para a Barra de Salvamento e Gerenciamento de Projetos
 container_barra_projeto = st.container()
 
+# Seletor rápido de modo na área principal
+m_col1, m_col2 = st.columns(2)
+with m_col1:
+    if st.button(
+        "📈 Gráfico de Linhas — Pontos Amostrais (Manhã, Tarde e Noite)",
+        type="primary" if tipo_grafico_atual == "linhas" else "secondary",
+        use_container_width=True
+    ):
+        if tipo_grafico_atual != "linhas":
+            st.session_state.tipo_grafico = "linhas"
+            p_l = PRESETS_LINHAS["Dia 14 de Agosto"]
+            st.session_state.nome_projeto_atual = p_l["titulo_dia"]
+            st.session_state.titulo_dia = p_l["titulo_dia"]
+            st.session_state.titulo_grafico = p_l["titulo_grafico"]
+            st.session_state.min_y = p_l["min_y"]
+            st.session_state.max_y = p_l["max_y"]
+            st.session_state.cfg["rotulo_x"] = "Pontos"
+            st.session_state.cfg["rotulo_y"] = "Temperatura do ar (°C)"
+            st.session_state.cfg["direcao_ticks"] = "Para dentro (in)"
+            st.session_state.cfg["ticks_topo"] = True
+            st.session_state.cfg["ticks_dir"] = True
+            st.session_state.editor_version += 1
+            st.rerun()
+with m_col2:
+    if st.button(
+        "📊 Gráfico de Barras — Média e Desvio Padrão (Bosque vs. Estacionamento)",
+        type="primary" if tipo_grafico_atual == "barras" else "secondary",
+        use_container_width=True
+    ):
+        if tipo_grafico_atual != "barras":
+            st.session_state.tipo_grafico = "barras"
+            p_b = PRESETS_BARRAS["TA — Média e Desvio Padrão (Agosto e Dezembro)"]
+            st.session_state.nome_projeto_atual = "TA - Média e Desvio Padrão"
+            st.session_state.titulo_dia = p_b["titulo_dia"]
+            st.session_state.titulo_grafico = p_b["titulo_grafico"]
+            st.session_state.min_y = p_b["min_y"]
+            st.session_state.max_y = p_b["max_y"]
+            st.session_state.cfg["rotulo_x"] = p_b["rotulo_x"]
+            st.session_state.cfg["rotulo_y"] = p_b["rotulo_y"]
+            st.session_state.cfg["opcao_fonte"] = "Arial (Científico Internacional)"
+            st.session_state.cfg["direcao_ticks"] = "Para fora (out)"
+            st.session_state.cfg["ticks_topo"] = False
+            st.session_state.cfg["ticks_dir"] = False
+            st.session_state.editor_version += 1
+            st.rerun()
+
+st.markdown("")
+
 # ---------------------------------------------------------------------------
 # ÁREA DE TRABALHO
 # ---------------------------------------------------------------------------
 col_tabela, col_grafico = st.columns([1, 1.25], gap="large")
 
 with col_tabela:
-    st.markdown("#### Matriz de Dados Experimentais")
+    if tipo_grafico_atual == "linhas":
+        st.markdown("#### Matriz de Dados Experimentais (Pontos P1–Pn)")
 
-    # Ferramenta para colar do Excel
-    with st.expander("Importar Bloco de Dados do Excel (Copiar e Colar)", expanded=False):
-        st.caption("Copie as células no Excel (Ctrl+C) e cole no campo abaixo. As vírgulas são convertidas automaticamente.")
-        destino_colar = st.selectbox(
-            "Destino dos dados:",
-            ["Apenas Manhã", "Apenas Tarde", "Apenas Noite", "Manhã, Tarde e Noite (3 colunas)", "Tabela Completa (Pontos + 3 colunas)"]
+        # Ferramenta para colar do Excel (Linhas)
+        with st.expander("Importar Bloco de Dados do Excel (Copiar e Colar)", expanded=False):
+            st.caption("Copie as células no Excel (Ctrl+C) e cole no campo abaixo. As vírgulas são convertidas automaticamente.")
+            destino_colar = st.selectbox(
+                "Destino dos dados:",
+                ["Apenas Manhã", "Apenas Tarde", "Apenas Noite", "Manhã, Tarde e Noite (3 colunas)", "Tabela Completa (Pontos + 3 colunas)"]
+            )
+            texto_colado = st.text_area("Área de transferência:", height=85, placeholder="Cole aqui os dados copiados do Excel...")
+
+            if st.button("Aplicar Dados na Tabela", use_container_width=True):
+                if texto_colado.strip():
+                    linhas_raw = [l.strip() for l in texto_colado.strip().split('\n') if l.strip()]
+                    df_temp = st.session_state.df_atual.copy()
+
+                    if destino_colar in ["Apenas Manhã", "Apenas Tarde", "Apenas Noite"]:
+                        col_alvo = "Manha" if "Manhã" in destino_colar else ("Tarde" if "Tarde" in destino_colar else "Noite")
+                        valores = []
+                        for l in linhas_raw:
+                            val_str = l.replace(',', '.').strip()
+                            try:
+                                v = float(val_str)
+                                if 60.0 < v <= 600.0:
+                                    v = v / 10.0
+                                valores.append(v)
+                            except ValueError:
+                                valores.append(np.nan)
+
+                        if len(valores) > len(df_temp):
+                            linhas_extras = len(valores) - len(df_temp)
+                            novos_pontos = [f"P{len(df_temp) + i + 1}" for i in range(linhas_extras)]
+                            df_extra = pd.DataFrame({'Pontos': novos_pontos, 'Manha': [np.nan]*linhas_extras, 'Tarde': [np.nan]*linhas_extras, 'Noite': [np.nan]*linhas_extras})
+                            df_temp = pd.concat([df_temp, df_extra], ignore_index=True)
+
+                        for i, v in enumerate(valores):
+                            df_temp.at[i, col_alvo] = v
+
+                    elif destino_colar == "Manhã, Tarde e Noite (3 colunas)":
+                        novas_linhas = []
+                        for l in linhas_raw:
+                            partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
+                            nums = []
+                            for p in partes[:3]:
+                                try:
+                                    v = float(p)
+                                    if 60.0 < v <= 600.0:
+                                        v = v / 10.0
+                                    nums.append(v)
+                                except ValueError:
+                                    nums.append(np.nan)
+                            while len(nums) < 3:
+                                nums.append(np.nan)
+                            novas_linhas.append(nums)
+
+                        df_temp = pd.DataFrame(novas_linhas, columns=['Manha', 'Tarde', 'Noite'])
+                        df_temp.insert(0, 'Pontos', [f"P{i+1}" for i in range(len(df_temp))])
+
+                    elif destino_colar == "Tabela Completa (Pontos + 3 colunas)":
+                        novas_linhas = []
+                        for l in linhas_raw:
+                            partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
+                            ponto_nome = partes[0]
+                            nums = []
+                            for p in partes[1:4]:
+                                try:
+                                    v = float(p)
+                                    if 60.0 < v <= 600.0:
+                                        v = v / 10.0
+                                    nums.append(v)
+                                except ValueError:
+                                    nums.append(np.nan)
+                            while len(nums) < 3:
+                                nums.append(np.nan)
+                            novas_linhas.append([ponto_nome] + nums)
+
+                        df_temp = pd.DataFrame(novas_linhas, columns=['Pontos', 'Manha', 'Tarde', 'Noite'])
+
+                    st.session_state.df_atual = df_temp
+                    st.session_state.editor_version += 1
+                    st.success("Dados colados e formatados com sucesso.")
+                    st.rerun()
+
+        # Identificadores e Eixos
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            titulo_dia_input = st.text_input(
+                "Identificador da Coleta / Dia:",
+                value=st.session_state.titulo_dia,
+                key=f"tit_dia_{v}"
+            )
+        with t_col2:
+            titulo_grafico_input = st.text_input(
+                "Título do Gráfico:",
+                value=st.session_state.titulo_grafico,
+                key=f"tit_graf_{v}"
+            )
+
+        r_col1, r_col2 = st.columns(2)
+        with r_col1:
+            rotulo_x_input = st.text_input(
+                "Legenda Eixo X:",
+                value=cfg["rotulo_x"],
+                key=f"rot_x_{v}"
+            )
+        with r_col2:
+            rotulo_y_input = st.text_input(
+                "Legenda Eixo Y:",
+                value=cfg["rotulo_y"],
+                key=f"rot_y_{v}"
+            )
+
+        # Limites da escala
+        e_col1, e_col2, e_col3, e_col4 = st.columns([1, 1, 1, 1])
+        with e_col1:
+            min_y_val = st.number_input(
+                "Y Mínimo (°C):",
+                value=float(st.session_state.min_y),
+                step=1.0,
+                key=f"min_y_{v}"
+            )
+        with e_col2:
+            max_y_val = st.number_input(
+                "Y Máximo (°C):",
+                value=float(st.session_state.max_y),
+                step=1.0,
+                key=f"max_y_{v}"
+            )
+
+        # Grade de edição interativa
+        editor_key = f"editor_principal_{v}"
+        df_bruto = st.data_editor(
+            st.session_state.df_atual,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "Pontos": st.column_config.TextColumn("Pontos", width="small", required=True),
+                "Manha": st.column_config.NumberColumn("Manha (°C)", format="%.1f", step=0.1),
+                "Tarde": st.column_config.NumberColumn("Tarde (°C)", format="%.1f", step=0.1),
+                "Noite": st.column_config.NumberColumn("Noite (°C)", format="%.1f", step=0.1),
+            },
+            height=370,
+            key=editor_key
         )
-        texto_colado = st.text_area("Área de transferência:", height=85, placeholder="Cole aqui os dados copiados do Excel...")
 
-        if st.button("Aplicar Dados na Tabela", use_container_width=True):
-            if texto_colado.strip():
-                linhas_raw = [l.strip() for l in texto_colado.strip().split('\n') if l.strip()]
-                df_temp = st.session_state.df_atual.copy()
+        df_sanitizado, foi_corrigido = sanitizar_dados_tabela(df_bruto)
+        if foi_corrigido:
+            st.session_state.df_atual = df_sanitizado
+            st.session_state.editor_version += 1
+            st.toast("Formatação decimal ajustada automaticamente.", icon="ℹ️")
+            st.rerun()
+        else:
+            df_editado = df_sanitizado
+            st.session_state.df_atual = df_editado.copy()
 
-                if destino_colar in ["Apenas Manhã", "Apenas Tarde", "Apenas Noite"]:
-                    col_alvo = "Manha" if "Manhã" in destino_colar else ("Tarde" if "Tarde" in destino_colar else "Noite")
-                    valores = []
-                    for l in linhas_raw:
-                        val_str = l.replace(',', '.').strip()
-                        try:
-                            v = float(val_str)
-                            if 60.0 < v <= 600.0:
-                                v = v / 10.0
-                            valores.append(v)
-                        except ValueError:
-                            valores.append(np.nan)
-
-                    if len(valores) > len(df_temp):
-                        linhas_extras = len(valores) - len(df_temp)
-                        novos_pontos = [f"P{len(df_temp) + i + 1}" for i in range(linhas_extras)]
-                        df_extra = pd.DataFrame({'Pontos': novos_pontos, 'Manha': [np.nan]*linhas_extras, 'Tarde': [np.nan]*linhas_extras, 'Noite': [np.nan]*linhas_extras})
-                        df_temp = pd.concat([df_temp, df_extra], ignore_index=True)
-
-                    for i, v in enumerate(valores):
-                        df_temp.at[i, col_alvo] = v
-
-                elif destino_colar == "Manhã, Tarde e Noite (3 colunas)":
-                    novas_linhas = []
-                    for l in linhas_raw:
-                        partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
-                        nums = []
-                        for p in partes[:3]:
-                            try:
-                                v = float(p)
-                                if 60.0 < v <= 600.0:
-                                    v = v / 10.0
-                                nums.append(v)
-                            except ValueError:
-                                nums.append(np.nan)
-                        while len(nums) < 3:
-                            nums.append(np.nan)
-                        novas_linhas.append(nums)
-
-                    df_temp = pd.DataFrame(novas_linhas, columns=['Manha', 'Tarde', 'Noite'])
-                    df_temp.insert(0, 'Pontos', [f"P{i+1}" for i in range(len(df_temp))])
-
-                elif destino_colar == "Tabela Completa (Pontos + 3 colunas)":
-                    novas_linhas = []
-                    for l in linhas_raw:
-                        partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
-                        ponto_nome = partes[0]
-                        nums = []
-                        for p in partes[1:4]:
-                            try:
-                                v = float(p)
-                                if 60.0 < v <= 600.0:
-                                    v = v / 10.0
-                                nums.append(v)
-                            except ValueError:
-                                nums.append(np.nan)
-                        while len(nums) < 3:
-                            nums.append(np.nan)
-                        novas_linhas.append([ponto_nome] + nums)
-
-                    df_temp = pd.DataFrame(novas_linhas, columns=['Pontos', 'Manha', 'Tarde', 'Noite'])
-
-                st.session_state.df_atual = df_temp
+        with e_col3:
+            st.write("")
+            st.write("")
+            if st.button("Renumerar P1..Pn", use_container_width=True):
+                st.session_state.df_atual['Pontos'] = [f"P{i+1}" for i in range(len(st.session_state.df_atual))]
                 st.session_state.editor_version += 1
-                st.success("Dados colados e formatados com sucesso.")
+                st.rerun()
+        with e_col4:
+            st.write("")
+            st.write("")
+            if st.button("Padronizar Decimais", use_container_width=True):
+                df_corr, _ = sanitizar_dados_tabela(st.session_state.df_atual)
+                st.session_state.df_atual = df_corr
+                st.session_state.editor_version += 1
                 st.rerun()
 
-    # Identificadores e Eixos
-    t_col1, t_col2 = st.columns(2)
-    with t_col1:
-        titulo_dia_input = st.text_input(
-            "Identificador da Coleta / Dia:",
-            value=st.session_state.titulo_dia,
-            key=f"tit_dia_{v}"
-        )
-    with t_col2:
-        titulo_grafico_input = st.text_input(
-            "Título do Gráfico:",
-            value=st.session_state.titulo_grafico,
-            key=f"tit_graf_{v}"
-        )
+        rotulo_s1 = cfg["rotulo_s1"]
+        rotulo_s2 = cfg["rotulo_s2"]
+        rotulo_s3 = cfg["rotulo_s3"]
+        rotulo_s4 = cfg["rotulo_s4"]
 
-    r_col1, r_col2 = st.columns(2)
-    with r_col1:
-        rotulo_x_input = st.text_input(
-            "Legenda Eixo X:",
-            value=cfg["rotulo_x"],
-            key=f"rot_x_{v}"
-        )
-    with r_col2:
-        rotulo_y_input = st.text_input(
-            "Legenda Eixo Y:",
-            value=cfg["rotulo_y"],
-            key=f"rot_y_{v}"
-        )
-
-    # Limites da escala
-    e_col1, e_col2, e_col3, e_col4 = st.columns([1, 1, 1, 1])
-    with e_col1:
-        min_y_val = st.number_input(
-            "Y Mínimo (°C):",
-            value=float(st.session_state.min_y),
-            step=1.0,
-            key=f"min_y_{v}"
-        )
-    with e_col2:
-        max_y_val = st.number_input(
-            "Y Máximo (°C):",
-            value=float(st.session_state.max_y),
-            step=1.0,
-            key=f"max_y_{v}"
-        )
-
-    # Grade de edição interativa
-    editor_key = f"editor_principal_{v}"
-    df_bruto = st.data_editor(
-        st.session_state.df_atual,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "Pontos": st.column_config.TextColumn("Pontos", width="small", required=True),
-            "Manha": st.column_config.NumberColumn("Manha (°C)", format="%.1f", step=0.1),
-            "Tarde": st.column_config.NumberColumn("Tarde (°C)", format="%.1f", step=0.1),
-            "Noite": st.column_config.NumberColumn("Noite (°C)", format="%.1f", step=0.1),
-        },
-        height=370,
-        key=editor_key
-    )
-
-    df_sanitizado, foi_corrigido = sanitizar_dados_tabela(df_bruto)
-    if foi_corrigido:
-        st.session_state.df_atual = df_sanitizado
-        st.session_state.editor_version += 1
-        st.toast("Formatação decimal ajustada automaticamente.", icon="ℹ️")
-        st.rerun()
     else:
-        df_editado = df_sanitizado
-        st.session_state.df_atual = df_editado.copy()
+        # -------------------------------------------------------------------
+        # TABELA DE MÉDIA E DESVIO PADRÃO (BARRAS AGRUPADAS)
+        # -------------------------------------------------------------------
+        st.markdown("#### Tabela de Média e Desvio Padrão (`TA`)")
 
-    with e_col3:
-        st.write("")
-        st.write("")
-        if st.button("Renumerar P1..Pn", use_container_width=True):
-            st.session_state.df_atual['Pontos'] = [f"P{i+1}" for i in range(len(st.session_state.df_atual))]
+        with st.expander("Importar Bloco de Dados do Excel (Copiar e Colar)", expanded=False):
+            st.caption("Copie as linhas da tabela no Excel (ex: Agosto | 27,32 | 2,3 | 28,5 | 4,87) e cole abaixo.")
+            texto_colado_b = st.text_area(
+                "Área de transferência (5 colunas: Mês, Bosque, Desvio/p, Estacionamento, Desvio/p):",
+                height=85,
+                placeholder="Agosto\t27,32\t2,3\t28,5\t4,87\nDezembro\t28,6\t1,42\t29,4\t2,19",
+                key=f"paste_b_{v}"
+            )
+            if st.button("Aplicar na Tabela de Média e Desvio", use_container_width=True):
+                if texto_colado_b.strip():
+                    linhas_b = [l.strip() for l in texto_colado_b.strip().split('\n') if l.strip()]
+                    novas_b = []
+                    for l in linhas_b:
+                        partes = [p.strip().replace(',', '.') for p in l.replace(';', '\t').split('\t')]
+                        if len(partes) >= 5:
+                            mes_nome = partes[0]
+                            vals_num = partes[1:5]
+                        elif len(partes) == 4:
+                            mes_nome = f"Mês {len(novas_b) + 1}"
+                            vals_num = partes[:4]
+                        else:
+                            continue
+                        nums = []
+                        for p in vals_num:
+                            try:
+                                nums.append(float(p))
+                            except ValueError:
+                                nums.append(np.nan)
+                        while len(nums) < 4:
+                            nums.append(np.nan)
+                        novas_b.append([mes_nome] + nums)
+                    if novas_b:
+                        st.session_state.df_barras = pd.DataFrame(
+                            novas_b,
+                            columns=['Mes', 'Bosque', 'Desvio_Bosque', 'Estacionamento', 'Desvio_Estacionamento']
+                        )
+                        st.session_state.editor_version += 1
+                        st.success("Tabela de Média e Desvio Padrão atualizada!")
+                        st.rerun()
+
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            titulo_dia_input = st.text_input(
+                "Cabeçalho da Tabela / Variável (ex: TA):",
+                value=st.session_state.titulo_dia,
+                key=f"tit_dia_b_{v}"
+            )
+        with t_col2:
+            titulo_grafico_input = st.text_input(
+                "Título Interno do Gráfico (opcional):",
+                value=st.session_state.titulo_grafico,
+                placeholder="Deixe vazio para padrão OriginLab",
+                key=f"tit_graf_b_{v}"
+            )
+
+        r_col1, r_col2 = st.columns(2)
+        with r_col1:
+            rotulo_x_input = st.text_input(
+                "Legenda Eixo X:",
+                value=cfg["rotulo_x"],
+                key=f"rot_x_b_{v}"
+            )
+        with r_col2:
+            rotulo_y_input = st.text_input(
+                "Legenda Eixo Y:",
+                value=cfg["rotulo_y"],
+                key=f"rot_y_b_{v}"
+            )
+
+        e_col1, e_col2, e_col3 = st.columns([1, 1, 1.2])
+        with e_col1:
+            min_y_val = st.number_input(
+                "Y Mínimo:",
+                value=float(st.session_state.min_y),
+                step=1.0,
+                key=f"min_y_b_{v}"
+            )
+        with e_col2:
+            max_y_val = st.number_input(
+                "Y Máximo:",
+                value=float(st.session_state.max_y),
+                step=1.0,
+                key=f"max_y_b_{v}"
+            )
+        with e_col3:
+            st.write("")
+            st.write("")
+            if st.button("Restaurar Tabela TA (Modelo)", use_container_width=True):
+                st.session_state.df_barras = PRESETS_BARRAS["TA — Média e Desvio Padrão (Agosto e Dezembro)"]["df"].copy()
+                st.session_state.min_y = 0.0
+                st.session_state.max_y = 35.0
+                st.session_state.editor_version += 1
+                st.rerun()
+
+        with st.expander("✏️ Personalizar Nomes das Colunas na Legenda", expanded=False):
+            nl1, nl2, nl3, nl4 = st.columns(4)
+            with nl1:
+                rotulo_s1 = st.text_input("Coluna 1:", value=cfg["rotulo_s1"], key=f"rs1_{v}")
+            with nl2:
+                rotulo_s2 = st.text_input("Coluna 2:", value=cfg["rotulo_s2"], key=f"rs2_{v}")
+            with nl3:
+                rotulo_s3 = st.text_input("Coluna 3:", value=cfg["rotulo_s3"], key=f"rs3_{v}")
+            with nl4:
+                rotulo_s4 = st.text_input("Coluna 4:", value=cfg["rotulo_s4"], key=f"rs4_{v}")
+
+        # Cabeçalho visual idêntico à tabela enviada (TA no topo)
+        st.markdown(
+            f"""
+            <div style="text-align:center; font-weight:600; border:1px solid rgba(128,128,128,0.35);
+                        border-bottom:none; border-radius:6px 6px 0 0; padding:4px; background:rgba(128,128,128,0.06);">
+                {titulo_dia_input or 'TA'}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        editor_barras_key = f"editor_barras_{v}"
+        df_bruto_b = st.data_editor(
+            st.session_state.df_barras,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "Mes": st.column_config.TextColumn("Mês", width="small", required=True),
+                "Bosque": st.column_config.NumberColumn(rotulo_s1, format="%.2f", step=0.01),
+                "Desvio_Bosque": st.column_config.NumberColumn(rotulo_s2, format="%.2f", step=0.01),
+                "Estacionamento": st.column_config.NumberColumn(rotulo_s3, format="%.2f", step=0.01),
+                "Desvio_Estacionamento": st.column_config.NumberColumn(rotulo_s4, format="%.2f", step=0.01),
+            },
+            height=220,
+            key=editor_barras_key
+        )
+
+        df_san_b, foi_corr_b = sanitizar_dados_barras(df_bruto_b)
+        if foi_corr_b:
+            st.session_state.df_barras = df_san_b
             st.session_state.editor_version += 1
+            st.toast("Formatação decimal ajustada automaticamente.", icon="ℹ️")
             st.rerun()
-    with e_col4:
-        st.write("")
-        st.write("")
-        if st.button("Padronizar Decimais", use_container_width=True):
-            df_corr, _ = sanitizar_dados_tabela(st.session_state.df_atual)
-            st.session_state.df_atual = df_corr
-            st.session_state.editor_version += 1
-            st.rerun()
+        else:
+            df_editado = df_san_b
+            st.session_state.df_barras = df_editado.copy()
+
+        # Calculadora auxiliar opcional para gerar Média e Desvio a partir dos pontos
+        with st.expander("🧮 Calcular Média e Desvio Padrão a partir de uma lista de valores", expanded=False):
+            st.caption("Se desejar calcular rapidamente a média e o desvio padrão amostral de um conjunto de medições:")
+            valores_calc_str = st.text_input(
+                "Digite ou cole os valores separados por espaço, ponto-e-vírgula ou quebra de linha:",
+                placeholder="Ex: 26,2  26,5  26,9  27,2  27,4  28,5  29,0",
+                key=f"calc_aux_{v}"
+            )
+            if valores_calc_str.strip():
+                partes_c = [p.strip().replace(',', '.') for p in valores_calc_str.replace(';', ' ').replace('\n', ' ').split(' ') if p.strip()]
+                nums_c = []
+                for p in partes_c:
+                    try:
+                        nums_c.append(float(p))
+                    except ValueError:
+                        pass
+                if len(nums_c) >= 2:
+                    s_calc = pd.Series(nums_c)
+                    st.info(
+                        f"**Média:** `{s_calc.mean():.2f}` (ou `{formatar_numero_ptbr(s_calc.mean())}`)  |  "
+                        f"**Desvio Padrão (amostral):** `{s_calc.std(ddof=1):.2f}` (ou `{formatar_numero_ptbr(s_calc.std(ddof=1))}`)  |  "
+                        f"**N:** `{len(nums_c)} valores`"
+                    )
 
 with col_grafico:
     # -----------------------------------------------------------------------
-    # CONTROLE DE SÉRIES ATIVAS (QUAIS LINHAS APARECEM NO GRÁFICO)
+    # CONTROLE DE SÉRIES ATIVAS (QUAIS LINHAS OU BARRAS APARECEM NO GRÁFICO)
     # -----------------------------------------------------------------------
     st.markdown("#### Visualização Gráfica Interativa")
 
-    col_ser_label, col_ser_m, col_ser_t, col_ser_n = st.columns([1.5, 1, 1, 1])
-    with col_ser_label:
-        st.markdown("**Séries visíveis:**")
-    with col_ser_m:
-        show_manha = st.checkbox("Manhã", value=bool(cfg["show_manha"]), key=f"sh_m_{v}")
-    with col_ser_t:
-        show_tarde = st.checkbox("Tarde", value=bool(cfg["show_tarde"]), key=f"sh_t_{v}")
-    with col_ser_n:
-        show_noite = st.checkbox("Noite", value=bool(cfg["show_noite"]), key=f"sh_n_{v}")
+    if tipo_grafico_atual == "linhas":
+        col_ser_label, col_ser_m, col_ser_t, col_ser_n = st.columns([1.5, 1, 1, 1])
+        with col_ser_label:
+            st.markdown("**Séries visíveis:**")
+        with col_ser_m:
+            show_manha = st.checkbox("Manhã", value=bool(cfg["show_manha"]), key=f"sh_m_{v}")
+        with col_ser_t:
+            show_tarde = st.checkbox("Tarde", value=bool(cfg["show_tarde"]), key=f"sh_t_{v}")
+        with col_ser_n:
+            show_noite = st.checkbox("Noite", value=bool(cfg["show_noite"]), key=f"sh_n_{v}")
 
-    series_ativas = []
-    if show_manha:
-        series_ativas.append("Manha")
-    if show_tarde:
-        series_ativas.append("Tarde")
-    if show_noite:
-        series_ativas.append("Noite")
+        series_ativas = []
+        if show_manha:
+            series_ativas.append("Manha")
+        if show_tarde:
+            series_ativas.append("Tarde")
+        if show_noite:
+            series_ativas.append("Noite")
+
+        show_bosque = cfg["show_bosque"]
+        show_desvio_bosque = cfg["show_desvio_bosque"]
+        show_estacionamento = cfg["show_estacionamento"]
+        show_desvio_estacionamento = cfg["show_desvio_estacionamento"]
+        series_barras_ativas = []
+    else:
+        cs_b1, cs_b2, cs_b3, cs_b4 = st.columns(4)
+        with cs_b1:
+            show_bosque = st.checkbox(rotulo_s1, value=bool(cfg["show_bosque"]), key=f"sh_bos_{v}")
+        with cs_b2:
+            show_desvio_bosque = st.checkbox(f"{rotulo_s2} (1)", value=bool(cfg["show_desvio_bosque"]), key=f"sh_db_{v}")
+        with cs_b3:
+            show_estacionamento = st.checkbox(rotulo_s3, value=bool(cfg["show_estacionamento"]), key=f"sh_est_{v}")
+        with cs_b4:
+            show_desvio_estacionamento = st.checkbox(f"{rotulo_s4} (2)", value=bool(cfg["show_desvio_estacionamento"]), key=f"sh_de_{v}")
+
+        series_barras_ativas = []
+        if show_bosque:
+            series_barras_ativas.append("Bosque")
+        if show_desvio_bosque:
+            series_barras_ativas.append("Desvio_Bosque")
+        if show_estacionamento:
+            series_barras_ativas.append("Estacionamento")
+        if show_desvio_estacionamento:
+            series_barras_ativas.append("Desvio_Estacionamento")
+
+        show_manha = cfg["show_manha"]
+        show_tarde = cfg["show_tarde"]
+        show_noite = cfg["show_noite"]
+        series_ativas = []
 
     # -----------------------------------------------------------------------
     # CONFIGURAÇÕES AVANÇADAS: LEGENDA (POSIÇÃO LIVRE / ARRASTAR) E BORDAS
@@ -956,7 +1789,6 @@ with col_grafico:
                 key=f"pos_pre_{v}"
             )
 
-        # Mapeamento ou ajuste milimétrico dos sliders
         if posicao_preset == "Superior Direito (Interno)":
             pad_x, pad_y, loc_ancora = 0.98, 0.98, 'upper right'
         elif posicao_preset == "Superior Esquerdo (Interno)":
@@ -972,7 +1804,6 @@ with col_grafico:
         else:
             pad_x, pad_y, loc_ancora = 0.98, 0.98, 'upper right'
 
-        # Se o preset atual é o mesmo salvo na configuração, preserva a coordenada fina ajustada
         val_x_inicial = float(cfg["leg_x"]) if posicao_preset == cfg["posicao_preset"] else float(pad_x)
         val_y_inicial = float(cfg["leg_y"]) if posicao_preset == cfg["posicao_preset"] else float(pad_y)
 
@@ -1058,6 +1889,19 @@ with col_grafico:
         "cor_manha": cor_manha,
         "cor_tarde": cor_tarde,
         "cor_noite": cor_noite,
+        "opcao_paleta_barras": opcao_paleta_barras,
+        "cor_bosque": cor_bosque,
+        "cor_desvio_bosque": cor_desvio_bosque,
+        "cor_estacionamento": cor_estacionamento,
+        "cor_desvio_estacionamento": cor_desvio_estacionamento,
+        "rotulo_s1": rotulo_s1,
+        "rotulo_s2": rotulo_s2,
+        "rotulo_s3": rotulo_s3,
+        "rotulo_s4": rotulo_s4,
+        "exibir_valores_barras": exibir_valores_barras,
+        "formato_decimais_barras": formato_decimais_barras,
+        "negrito_valores_barras": negrito_valores_barras,
+        "largura_grupo_barras": largura_grupo_barras,
         "espessura_linha": espessura_linha,
         "com_marcadores": com_marcadores,
         "exibir_grade": exibir_grade,
@@ -1065,6 +1909,10 @@ with col_grafico:
         "show_manha": show_manha,
         "show_tarde": show_tarde,
         "show_noite": show_noite,
+        "show_bosque": show_bosque,
+        "show_desvio_bosque": show_desvio_bosque,
+        "show_estacionamento": show_estacionamento,
+        "show_desvio_estacionamento": show_desvio_estacionamento,
         "exibir_legenda": exibir_legenda,
         "moldura_legenda": moldura_legenda,
         "orientacao_leg": orientacao_leg,
@@ -1086,27 +1934,58 @@ with col_grafico:
     }
 
     # -----------------------------------------------------------------------
-    # RENDERIZAÇÃO DO GRÁFICO
+    # RENDERIZAÇÃO DO GRÁFICO (LINHAS OU BARRAS)
     # -----------------------------------------------------------------------
-    fig_preview = gerar_figura_matplotlib(
-        df=df_editado,
-        titulo_grafico=titulo_grafico_input,
-        rotulo_x=rotulo_x_input,
-        rotulo_y=rotulo_y_input,
-        min_y=min_y_val,
-        max_y=max_y_val,
-        series_ativas=series_ativas,
-        cores_periodos=cores_selecionadas,
-        estilos_linhas=estilos_linhas,
-        fonte_nome=opcao_fonte,
-        tamanho_fonte=tamanho_fonte,
-        espessura_linha=espessura_linha,
-        com_marcadores=com_marcadores,
-        bordas_config=bordas_config,
-        ticks_config=ticks_config,
-        legenda_config=legenda_config,
-        exibir_grade=exibir_grade
-    )
+    rotulos_legenda_dict = {
+        "Bosque": rotulo_s1,
+        "Desvio_Bosque": rotulo_s2,
+        "Estacionamento": rotulo_s3,
+        "Desvio_Estacionamento": rotulo_s4,
+    }
+
+    if tipo_grafico_atual == "linhas":
+        fig_preview = gerar_figura_matplotlib(
+            df=df_editado,
+            titulo_grafico=titulo_grafico_input,
+            rotulo_x=rotulo_x_input,
+            rotulo_y=rotulo_y_input,
+            min_y=min_y_val,
+            max_y=max_y_val,
+            series_ativas=series_ativas,
+            cores_periodos=cores_selecionadas,
+            estilos_linhas=estilos_linhas,
+            fonte_nome=opcao_fonte,
+            tamanho_fonte=tamanho_fonte,
+            espessura_linha=espessura_linha,
+            com_marcadores=com_marcadores,
+            bordas_config=bordas_config,
+            ticks_config=ticks_config,
+            legenda_config=legenda_config,
+            exibir_grade=exibir_grade
+        )
+    else:
+        fig_preview = gerar_figura_barras_matplotlib(
+            df=df_editado,
+            titulo_grafico=titulo_grafico_input,
+            rotulo_x=rotulo_x_input,
+            rotulo_y=rotulo_y_input,
+            min_y=min_y_val,
+            max_y=max_y_val,
+            series_barras_ativas=series_barras_ativas,
+            cores_barras=cores_barras_selecionadas,
+            rotulos_legenda=rotulos_legenda_dict,
+            fonte_nome=opcao_fonte,
+            tamanho_fonte=tamanho_fonte,
+            exibir_valores=exibir_valores_barras,
+            formato_decimais=formato_decimais_barras,
+            negrito_valores=negrito_valores_barras,
+            largura_grupo=largura_grupo_barras,
+            bordas_config=bordas_config,
+            ticks_config=ticks_config,
+            legenda_config=legenda_config,
+            exibir_grade=exibir_grade
+        )
+
     st.pyplot(fig_preview)
 
     # -----------------------------------------------------------------------
@@ -1115,12 +1994,14 @@ with col_grafico:
     st.markdown("##### Exportar Resultados:")
     btn_col1, btn_col2, btn_col3 = st.columns(3)
 
+    nome_arq_base = (titulo_dia_input or "grafico").replace(" ", "_").lower()
+
     buf_png = io.BytesIO()
     fig_preview.savefig(buf_png, format="png", dpi=300, bbox_inches="tight")
     btn_col1.download_button(
         label="Download Imagem PNG (300 DPI)",
         data=buf_png.getvalue(),
-        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_figura.png",
+        file_name=f"{nome_arq_base}_figura.png",
         mime="image/png",
         use_container_width=True
     )
@@ -1130,22 +2011,35 @@ with col_grafico:
     btn_col2.download_button(
         label="Download Vetor PDF (Publicação)",
         data=buf_pdf.getvalue(),
-        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_figura.pdf",
+        file_name=f"{nome_arq_base}_figura.pdf",
         mime="application/pdf",
         use_container_width=True
     )
 
-    excel_bytes = gerar_excel_bytes(
-        df=df_editado,
-        titulo_dia=titulo_dia_input,
-        titulo_grafico=titulo_grafico_input,
-        min_y=min_y_val,
-        max_y=max_y_val
-    )
+    if tipo_grafico_atual == "linhas":
+        excel_bytes = gerar_excel_bytes(
+            df=df_editado,
+            titulo_dia=titulo_dia_input,
+            titulo_grafico=titulo_grafico_input,
+            min_y=min_y_val,
+            max_y=max_y_val
+        )
+    else:
+        excel_bytes = gerar_excel_barras_bytes(
+            df=df_editado,
+            titulo_tabela=titulo_dia_input,
+            titulo_grafico=titulo_grafico_input,
+            rotulo_x=rotulo_x_input,
+            rotulo_y=rotulo_y_input,
+            min_y=min_y_val,
+            max_y=max_y_val,
+            rotulos_legenda=rotulos_legenda_dict
+        )
+
     btn_col3.download_button(
         label="Exportar Planilha Excel (.xlsx)",
         data=excel_bytes,
-        file_name=f"{titulo_dia_input.replace(' ', '_').lower()}_dados.xlsx",
+        file_name=f"{nome_arq_base}_dados.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
@@ -1182,7 +2076,7 @@ with container_barra_projeto:
 
         with p_col3:
             opcoes_carregar = ["Selecione um projeto salvo..."] + [
-                f"{nome} ({projetos_salvos_dict[nome].get('atualizado_em', '')})"
+                f"{'📊' if projetos_salvos_dict[nome].get('tipo_grafico') == 'barras' else '📈'} {nome} ({projetos_salvos_dict[nome].get('atualizado_em', '')})"
                 for nome in nomes_projetos_salvos
             ]
             projeto_selecionado_label = st.selectbox(
@@ -1192,7 +2086,6 @@ with container_barra_projeto:
                 key=f"sel_proj_salvo_{v}"
             )
 
-        # Extrai o nome real do projeto selecionado no dropdown
         idx_sel_proj = opcoes_carregar.index(projeto_selecionado_label) - 1 if projeto_selecionado_label in opcoes_carregar else -1
         nome_proj_selecionado = nomes_projetos_salvos[idx_sel_proj] if idx_sel_proj >= 0 else None
 
@@ -1200,6 +2093,7 @@ with container_barra_projeto:
             st.write("")
             payload_atual = construir_payload_projeto(
                 nome_projeto=nome_projeto_input or titulo_dia_input,
+                tipo_grafico=tipo_grafico_atual,
                 df=df_editado,
                 titulo_dia=titulo_dia_input,
                 titulo_grafico=titulo_grafico_input,
@@ -1236,6 +2130,7 @@ with container_barra_projeto:
             nome_final = (nome_projeto_input.strip() if nome_projeto_input and nome_projeto_input.strip() else titulo_dia_input.strip()) or "Meu Projeto"
             novo_payload = construir_payload_projeto(
                 nome_projeto=nome_final,
+                tipo_grafico=tipo_grafico_atual,
                 df=df_editado,
                 titulo_dia=titulo_dia_input,
                 titulo_grafico=titulo_grafico_input,
@@ -1280,14 +2175,33 @@ with container_barra_projeto:
 # ---------------------------------------------------------------------------
 st.markdown("---")
 with st.expander("Sumário Estatístico Descritivo das Medições", expanded=False):
-    s_col1, s_col2, s_col3 = st.columns(3)
-    for idx, (periodo, s_col) in enumerate(zip(['Manha', 'Tarde', 'Noite'], [s_col1, s_col2, s_col3])):
-        if periodo in df_editado.columns and periodo in series_ativas:
-            serie = pd.to_numeric(df_editado[periodo], errors='coerce').dropna()
-            if not serie.empty:
-                s_col.markdown(f"**Série: {periodo}**")
-                s_col.write(f"- Média Amostral: `{serie.mean():.2f} °C`")
-                s_col.write(f"- Desvio Padrão: `{serie.std():.2f} °C`")
-                s_col.write(f"- Temperatura Mínima: `{serie.min():.2f} °C`")
-                s_col.write(f"- Temperatura Máxima: `{serie.max():.2f} °C`")
-                s_col.write(f"- Amplitude Térmica: `{(serie.max() - serie.min()):.2f} °C`")
+    if tipo_grafico_atual == "linhas":
+        s_col1, s_col2, s_col3 = st.columns(3)
+        for idx, (periodo, s_col) in enumerate(zip(['Manha', 'Tarde', 'Noite'], [s_col1, s_col2, s_col3])):
+            if periodo in df_editado.columns and periodo in series_ativas:
+                serie = pd.to_numeric(df_editado[periodo], errors='coerce').dropna()
+                if not serie.empty:
+                    s_col.markdown(f"**Série: {periodo}**")
+                    s_col.write(f"- Média Amostral: `{serie.mean():.2f} °C`")
+                    s_col.write(f"- Desvio Padrão: `{serie.std():.2f} °C`")
+                    s_col.write(f"- Temperatura Mínima: `{serie.min():.2f} °C`")
+                    s_col.write(f"- Temperatura Máxima: `{serie.max():.2f} °C`")
+                    s_col.write(f"- Amplitude Térmica: `{(serie.max() - serie.min()):.2f} °C`")
+    else:
+        sb_col1, sb_col2 = st.columns(2)
+        with sb_col1:
+            st.markdown(f"**{rotulo_s1}:**")
+            for _, row in df_editado.iterrows():
+                m_nome = row.get("Mes", "")
+                v_med = row.get("Bosque", np.nan)
+                v_std = row.get("Desvio_Bosque", np.nan)
+                if pd.notnull(v_med):
+                    st.write(f"- **{m_nome}**: Média = `{formatar_numero_ptbr(v_med)} °C` | Desvio Padrão = `± {formatar_numero_ptbr(v_std)} °C`")
+        with sb_col2:
+            st.markdown(f"**{rotulo_s3}:**")
+            for _, row in df_editado.iterrows():
+                m_nome = row.get("Mes", "")
+                v_med = row.get("Estacionamento", np.nan)
+                v_std = row.get("Desvio_Estacionamento", np.nan)
+                if pd.notnull(v_med):
+                    st.write(f"- **{m_nome}**: Média = `{formatar_numero_ptbr(v_med)} °C` | Desvio Padrão = `± {formatar_numero_ptbr(v_std)} °C`")

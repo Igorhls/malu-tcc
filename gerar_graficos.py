@@ -370,6 +370,83 @@ def gerar_planilha_excel(nome_arquivo="dados_e_graficos_bosque.xlsx"):
     print(f"[OK] Planilha Excel gerada: {nome_arquivo}")
 
 
+def gerar_grafico_media_desvio(pasta_saida="graficos_gerados"):
+    """Gera o gráfico de barras agrupadas de Média e Desvio Padrão (TA: Agosto e Dezembro)."""
+    os.makedirs(pasta_saida, exist_ok=True)
+    plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans', 'sans-serif']
+    plt.rcParams['font.family'] = 'sans-serif'
+
+    meses = ['Agosto', 'Dezembro']
+    series = [
+        ('Bosque', [27.32, 28.60], '#fdc086'),
+        ('Desvio/p', [2.30, 1.42], '#8fd194'),
+        ('Estacionamento', [28.50, 29.40], '#c2b2d6'),
+        ('Desvio/p', [4.87, 2.19], '#ffff99'),
+    ]
+
+    fig, ax = plt.subplots(figsize=(7.4, 4.6), dpi=300)
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
+
+    x_indices = np.arange(len(meses))
+    largura_grupo = 0.68
+    largura_barra = largura_grupo / len(series)
+    offsets = np.linspace(
+        -largura_grupo / 2.0 + largura_barra / 2.0,
+        largura_grupo / 2.0 - largura_barra / 2.0,
+        len(series)
+    )
+
+    for idx_s, (rotulo, valores, cor) in enumerate(series):
+        pos_x = x_indices + offsets[idx_s]
+        barras = ax.bar(
+            pos_x, valores, width=largura_barra, label=rotulo,
+            color=cor, edgecolor='#707070', linewidth=0.75, zorder=3
+        )
+        for rect, val in zip(barras, valores):
+            txt = f"{val:.2f}".rstrip('0').rstrip('.').replace('.', ',')
+            ax.annotate(
+                txt,
+                xy=(rect.get_x() + rect.get_width() / 2.0, rect.get_height()),
+                xytext=(0, 2.5),
+                textcoords="offset points",
+                ha='center', va='bottom', fontsize=9.8, fontweight='bold', color='black'
+            )
+
+    ax.set_xticks(x_indices)
+    ax.set_xticklabels(meses, fontsize=10.5)
+    ax.set_xlim(-0.5, len(x_indices) - 0.5)
+    ax.set_ylim(0, 35)
+
+    for spine in ax.spines.values():
+        spine.set_color('black')
+        spine.set_linewidth(1.0)
+
+    ax.tick_params(which='major', direction='out', top=False, right=False, bottom=True, left=True, length=5, width=1.0, color='black', labelsize=10.5)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
+    ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+    ax.xaxis.set_minor_locator(ticker.FixedLocator(np.arange(-0.5, len(x_indices) + 0.5, 1.0)))
+    ax.tick_params(which='minor', direction='out', top=False, right=False, bottom=True, left=True, length=2.8, width=0.8, color='black')
+
+    ax.set_xlabel("TA", fontsize=11.5, color='black', labelpad=8)
+    ax.set_ylabel("Média (%)", fontsize=11, color='black', labelpad=8)
+
+    leg = ax.legend(
+        loc='upper right', bbox_to_anchor=(0.98, 0.98), frameon=True,
+        edgecolor='black', facecolor='white', framealpha=1.0,
+        fontsize=9.0, handlelength=1.8, handleheight=1.1, handletextpad=0.5, borderpad=0.45, labelspacing=0.35
+    )
+    leg.get_frame().set_linewidth(0.9)
+
+    plt.tight_layout()
+    caminho_png = os.path.join(pasta_saida, "grafico_media_desvio_ta.png")
+    caminho_pdf = os.path.join(pasta_saida, "grafico_media_desvio_ta.pdf")
+    plt.savefig(caminho_png, bbox_inches='tight', dpi=300)
+    plt.savefig(caminho_pdf, bbox_inches='tight')
+    plt.close()
+    print(f"[OK] Gráfico de Média e Desvio Padrão (TA) gerado: {caminho_png} e {caminho_pdf}")
+
+
 def main():
     print("=" * 60)
     print("VZN EcoClima - Gerador de Gráficos (Padrão OriginLab Pro)")
@@ -381,7 +458,10 @@ def main():
     print("\n2. Gerando painel combinado (OriginLab Pro)...")
     gerar_painel_combinado(estilo="OriginLab Pro")
 
-    print("\n3. Gerando planilha Excel...")
+    print("\n3. Gerando gráfico de Média e Desvio Padrão (TA)...")
+    gerar_grafico_media_desvio()
+
+    print("\n4. Gerando planilha Excel...")
     gerar_planilha_excel()
 
     print("\n" + "=" * 60)
@@ -391,3 +471,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
