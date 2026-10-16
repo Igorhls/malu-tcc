@@ -20,11 +20,12 @@ py -m streamlit run app.py
 *(ou simplesmente `streamlit run app.py`)*
 
 ### Recursos do aplicativo:
+- 💾 **Salvar e Retomar Projetos**: Botão de salvamento rápido que guarda todos os dados da tabela e personalizações do gráfico (cores, fontes, bordas, legenda e escalas) para continuar o trabalho posteriormente, além de backup/importação em `.json`.
 - 📅 **Seleção de Dias**: Filtro por dia específico ou painel geral integrado.
 - 🕒 **Filtros de Período**: Seleção individual ou combinada de Manhã, Tarde e Noite.
 - 📈 **Gráficos em Alta Resolução**: Renderização vetorial dos gráficos idênticos ao modelo.
 - 📊 **Estatísticas Descritivas**: Temperatura média, máxima, mínima e amplitude térmica.
-- 📥 **Exportação Rápida**: Download direto das figuras em PNG (300 DPI) e da planilha Excel (.xlsx).
+- 📥 **Exportação Rápida**: Download direto das figuras em PNG (300 DPI), PDF vetorial e planilha Excel (.xlsx).
 
 ---
 
