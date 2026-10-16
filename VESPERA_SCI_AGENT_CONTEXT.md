@@ -17,8 +17,8 @@
 ## 1. Status Atual das 3 Etapas
 
 * ✅ **Etapa 1 (Concluída — Commit `cefdb38`):** Setup do repositório `vespera-sci`, documentação oficial (`README.md`) e extração modular completa das camadas `config/` (`themes.py`, `presets.py`) e `core/` (`sanitizer.py`, `plot_engine.py`, `excel_exporter.py`, `project_manager.py`).
-* ✅ **Etapa 2 (Concluída):** Construção do aplicativo desktop nativo em **PySide6** (`main.py` e módulos dentro de `ui/`: `main_window.py`, `sidebar_controls.py`, `data_table_widget.py`, `plot_canvas_widget.py`).
-* ⏳ **Etapa 3 (Próxima Etapa — Aguardando Aprovação do Usuário):** Implementação do sistema de **Auto-Update via GitHub** (`core/updater.py` + `ui/update_dialog.py`) e empacotamento local (`.exe` / lançador portátil) para a usuária final.
+* ✅ **Etapa 2 (Concluída — Commit `1969504`):** Construção do aplicativo desktop nativo em **PySide6** (`main.py` e módulos dentro de `ui/`: `main_window.py`, `sidebar_controls.py`, `data_table_widget.py`, `plot_canvas_widget.py`).
+* ✅ **Etapa 3 (Concluída):** Implementação do sistema de **Auto-Update via GitHub** (`core/updater.py` + `ui/update_dialog.py`), lançadores locais com 1 clique (`Iniciar_Vespera_Sci.bat`, `Instalar_Vespera_Sci.bat`) e script de empacotamento `.exe` (`build_exe.py`).
 
 ---
 
